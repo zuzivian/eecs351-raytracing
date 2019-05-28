@@ -14,8 +14,8 @@ CRay.prototype.printMe = function() {
 // print ray's values in the console window:
 	if(name == undefined) name = ' ';
 
-	console.log('CRay::' + this.constructor.name + '.origin:\t' + this.orig[0]
+	console.log('CRay::' + this.constructor.name + '.orig:\t' + this.orig[0]
 	+',\t'+ this.orig[1] +',\t'+ this.orig[2] +',\t'+ this.orig[3]);
-	console.log('     ', + this.constructor.name + '.direction:\t' + this.dir[0]
+	console.log('     ', + this.constructor.name + '.dir:\t' + this.dir[0]
 	+',\t'+  this.dir[1] + '\t'+  this.dir[2] +',\t'+ this.dir[3]);
 }

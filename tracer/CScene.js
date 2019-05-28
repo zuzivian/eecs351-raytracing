@@ -1,6 +1,6 @@
 //===  CScene.js  ===================================================
 
-function CScene() {
+function CScene(imgBuf) {
 //=============================================================================
 // A complete ray tracer object prototype (formerly a C/C++ 'class').
 //      My code uses just one CScene instance (g_myScene) to describe the entire
@@ -60,7 +60,34 @@ function CScene() {
                                     // (why?  JS uses 52-bit mantissa;
                                     // 2^-52 = 2.22E-16, so 10^-15 gives a
                                     // safety margin of 20:1 for small # calcs)
-
+  this.img = imgBuf;
 	//  TODO:	YOU WRITE THIS!
 
+}
+
+CScene.prototype.makeRayTracedImage = function() {
+	// Create an image by Ray-tracing.   (called when you press 'T' or 't')
+  var eyeRay = new CRay();	// the ray we trace from our camera for each pixel
+  var myCam = new CCamera();	// the 3D camera that sets eyeRay values
+  var myGrid = new CGeom(JT_GNDPLANE);
+  var colr = vec4.create();	// floating-point RGBA color value
+	console.log("colr obj:", colr);
+	var hit = 0;
+	var idx = 0;  // CImgBuf array index(i,j) == (j*this.xSiz + i)*this.pixSiz
+  var i,j;      // pixel x,y coordinate (origin at lower left; integer values)
+  for(j=0; j< this.img.ySiz; j++) {       // for the j-th row of pixels.
+  	for(i=0; i< this.img.xSiz; i++) {	    // and the i-th pixel on that row,
+			myCam.setEyeRay(eyeRay,i,j);						  // create ray for pixel (i,j)
+			if(i==0 && j==0) console.log('eyeRay:', eyeRay);
+			hit = myGrid.traceGrid(eyeRay);						// trace ray to the grid
+			if(hit==0) vec4.copy(colr, myGrid.gapColor);
+			else if (hit==1) vec4.copy(colr, myGrid.lineColor);
+			else vec4.copy(colr, myGrid.skyColor);
+		  idx = (j*this.img.xSiz + i)*this.img.pixSiz;	// Array index at pixel (i,j)
+	  	this.img.fBuf[idx   ] = colr[0];
+	  	this.img.fBuf[idx +1] = colr[1];
+	  	this.img.fBuf[idx +2] = colr[2];
+  	}
+	}
+	this.img.float2int();		// create integer image from floating-point buffer.
 }

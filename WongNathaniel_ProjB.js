@@ -9,6 +9,11 @@
 //	LineGrid.js 		Northwestern Univ. Nathaniel Wong, for EECS 351-2
 //----------------------------------------------------------------------
 
+// Defined Constants
+// ============================================================================
+const G_SCENE_MAX = 3;		// Number of scenes defined.
+const G_AA_MAX    = 4;				// highest super-sampling number allowed.
+
 // Global Variables
 // ============================================================================
 //-----For WebGL usage:-------------------------
@@ -17,8 +22,7 @@ var gl;													// WebGL rendering context -- the 'webGL' object
 var g_canvasID;									// HTML-5 'canvas' element ID#
 
 //-----Mouse,keyboard, GUI variables-----------
-var gui = new GUIbox(); // Holds all (Graphical) User Interface fcns & vars, for
-                        // keyboard, mouse, HTML buttons, window re-sizing, etc.
+var gui = new GUIbox(); // Holds all (Graphical) User Interface fcns & vars
 
 //-----For the VBOs & Shaders:-----------------
 preView = new VBObox0();		// For WebGLpreview: holds one VBO and its shaders
@@ -27,15 +31,10 @@ rayView = new VBObox1();		// for displaying the ray-tracing results.
 //-----------Ray Tracer Objects:---------------
 var g_myPic = new CImgBuf(256,256); // Create a floating-point image-buffer
                         // object to hold the image created by 'g_myScene' object.
-
 var g_myScene = new CScene(g_myPic); // Create our ray-tracing object;
 
 var g_SceneNum = 0;			// scene-selector number; 0,1,2,... G_SCENE_MAX-1
-var G_SCENE_MAX = 3;		// Number of scenes defined.
-
-var g_AAcode = 1;			// Antialiasing setting: 1 == NO antialiasing at all.
-                        // 2,3,4... == supersamples: 2x2, 3x3, 4x4, ...
-var G_AA_MAX = 4;				// highest super-sampling number allowed.
+var g_AAcode = 1;			// Antialiasing setting (1x1-4x4)
 var g_isJitter = 0;     // ==1 for jitter, ==0 for no jitter.
 
 //-----For animation & timing:---------------------
@@ -48,7 +47,6 @@ var g_angleRate0 = 45.0;				// Rotation angle rate, in degrees/second.
 */
 
 function main() {
-
   // Retrieve the HTML-5 <canvas> element where webGL will draw our pictures:
   g_canvasID = document.getElementById('webgl');
 
@@ -73,7 +71,6 @@ function main() {
 }
 
 function drawAll() {
-//=============================================================================
 // Re-draw all WebGL contents in our browser window.
 // NOTE: this program doesn't have an animation loop!
 //  We only re-draw the screen when the user needs it redrawn
@@ -81,7 +78,6 @@ function drawAll() {
   // Clear <canvas> color AND DEPTH buffer
   gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
-  // Use OpenGL/ WebGL 'viewports' to map the CVV to the 'drawing context',
   // Draw in the LEFT viewport:
 	gl.viewport(0,														// Viewport lower-left corner
 							0,														// (x,y) location(in pixels)
@@ -92,7 +88,6 @@ function drawAll() {
 	preView.draw();			  // draw our VBO's contents using our shaders.
 
   // Draw in the RIGHT viewport:
-
 	gl.viewport(gl.drawingBufferWidth/2,   // Viewport lower-left corner
 	            0,      // location(in pixels)
 	            gl.drawingBufferWidth/2, 			// viewport width, height.
@@ -103,9 +98,7 @@ function drawAll() {
 }
 
 function onSuperSampleButton() {
-//=============================================================================
-// advance to the next antialiasing mode.
-	//console.log('ON-SuperSample BUTTON!');
+  // advance to the next antialiasing mode.
   g_AAcode += 1;
   if(g_AAcode > G_AA_MAX) g_AAcode = 1; // 1,2,3,4, 1,2,3,4, 1,2,... etc
 
@@ -124,7 +117,6 @@ function onSuperSampleButton() {
 }
 
 function onJitterButton() {
-	//console.log('ON-JITTER button!!');
   g_isJitter = g_isJitter ? 0 : 1;
 
   if(g_AAcode==1) {
@@ -142,7 +134,6 @@ function onJitterButton() {
 }
 
 function onSceneButton() {
-	//console.log('ON-SCENE BUTTON!');
 	if(g_SceneNum < 0 || g_SceneNum >= G_SCENE_MAX) g_SceneNum = 0;
 	else g_SceneNum = g_SceneNum +1;
 
