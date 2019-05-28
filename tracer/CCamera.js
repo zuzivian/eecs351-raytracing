@@ -106,14 +106,6 @@ function CCamera() {
 	this.uAxis = vec4.fromValues(1,0,0,0);	// camera U axis == world x axis
   this.vAxis = vec4.fromValues(0,1,0,0);	// camera V axis == world y axis
   this.nAxis = vec4.fromValues(0,0,1,0);	// camera N axis == world z axis.
-		  	// (and thus we're gazing down the -Z axis with default camera).
-
-  // LOOK AT THE HORIZON:
-	/*
-		this.uAxis = vec4.fromValues(1,0,0,0);	// camera U axis == world x axis
-	  this.vAxis = vec4.fromValues(0,0,1,0);	// camera V axis == world z axis
-	  this.nAxis = vec4.fromValues(0,-1,0,0);	// camera N axis == world -y axis.
-	*/
 
 	// b) -- Camera 'intrinsic' parameters that set the camera's optics and images.
 	// They define the camera's image frustum: its image plane is at N = -znear
@@ -138,15 +130,6 @@ function CCamera() {
 	// To ray-trace an image of xmax,ymax pixels, divide this rectangular image
 	// plane into xmax,ymax rectangular tiles, and shoot eye-rays from the camera's
 	// center-of-projection through those tiles to find scene color values.
-	// --For the simplest, fastest image (without antialiasing), trace each eye-ray
-	// through the CENTER of each tile to find pixel colors.
-	// --For slower, better-looking, anti-aliased image making, apply jittered
-	// super-sampling: For each pixel:
-	//			--subdivide the 'tile' into equal-sized 'sub-tiles';
-	//			--trace one ray per sub-tile, but randomize (jitter) the ray's position
-	//					within the sub-tile,
-	//			--set pixel color to the average of all sub-tile colors.
-	// Let's do that:
 
 	// Divide the image plane into rectangular tiles, one for each pixel:
 	this.ufrac = (this.iRight - this.iLeft) / this.xmax;	// pixel tile's width
@@ -164,17 +147,7 @@ CCamera.prototype.rayFrustum = function(left, right, bot, top, near) {
 	// bot,top == -y,+y limits of viewing frustum measured
 	// near =- distance from COP to the image-forming plane. 'near' MUST be positive
 	//         (even though the image-forming plane is at z = -near).
-
-	/*
-	  console.log("you called CCamera.rayFrustum()");
-		  //
-		  //
-		  // YOU WRITE THIS (see CRay.prototype.printMe() function above)
-		  //
-		  //
-	*/
-
-  // UNTESTED!!!
+	/// UNTESTED!!
   this.iLeft = left;
   this.iRight = right;
   this.iBot = bot;
@@ -190,15 +163,7 @@ CCamera.prototype.rayPerspective = function(fovy, aspect, zNear) {
 	//  fovy == vertical field-of-view (bottom-to-top) in degrees
 	//  aspect ratio == camera image width/height
 	//  zNear == distance from COP to the image-forming plane. zNear MUST be >0.
-	/*
-	  console.log("you called CCamera.rayPerspective");
-			//
-			//
-			//		YOU WRITE THIS
-			//
-			//
-	*/
-  // UNTESTED!!!
+	/// UNTESTED!!
   this.iNear = zNear;
   this.iTop = zNear * Math.tan(0.5*fovy*(Math.PI/180.0)); // tan(radians)
   this.iBot = -iTop;
@@ -207,26 +172,19 @@ CCamera.prototype.rayPerspective = function(fovy, aspect, zNear) {
 }
 
 CCamera.prototype.raylookAt = function(eyePt, aimPt, upVec) {
-//==============================================================================
-// Adjust the orientation and position of this ray-tracing camera
-// in 'world' coordinate system.
-// Results should exactly match WebGL camera posed by the same arguments.
-//
-// Each argument (eyePt, aimPt, upVec) is a glMatrix 'vec3' object.
-/*
-  console.log("you called CCamera.rayLookAt().");
-		//
-		//
-		//		YOU WRITE THIS
-		//
-		//
-*/
-  // UNTESTED!!!
+	// Adjust the orientation and position of this ray-tracing camera
+	// in 'world' coordinate system.
+	// Results should exactly match WebGL camera posed by the same arguments.
+	//
+	// Each argument (eyePt, aimPt, upVec) is a glMatrix 'vec3' object.
+
+	vec4.copy(this.eyePt, eyePt);
   vec3.subtract(this.nAxis, eyePt, aimPt);  // aim-eye == MINUS N-axis direction
   vec3.normalize(this.nAxis, this.nAxis);   // N-axis must have unit length.
-  vec3.cross(this.uAxis, this.upVec, this.nAxis);  // U-axis == upVec cross N-axis
+  vec3.cross(this.uAxis, upVec, this.nAxis);  // U-axis == upVec cross N-axis
   vec3.normalize(this.uAxis, this.uAxis);   // make it unit-length.
   vec3.cross(this.vAxis, this.nAxis, this.uAxis); // V-axis == N-axis cross U-axis
+
 }
 
 CCamera.prototype.setEyeRay = function(myeRay, xpos, ypos) {

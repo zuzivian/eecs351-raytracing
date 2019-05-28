@@ -31,7 +31,7 @@ function CGeom(shapeSelect) {
 // or box, just set the parameters in world2model matrix. Note that you can
 // scale the box or sphere differently in different directions, forming
 // ellipsoids for the unit sphere and rectangles (or prisms) from the unit box.
-	if(shapeSelect == undefined) shapeSelect = JT_GND_PLANE;	// default
+	if(shapeSelect == undefined) shapeSelect = JT_GNDPLANE;	// default
 	this.shapeType = shapeSelect;
 
 	this.world2model = mat4.create();	// the matrix used to transform rays from
@@ -42,10 +42,10 @@ function CGeom(shapeSelect) {
 	this.zGrid = -5.0;	// create line-grid on the unbounded plane at z=zGrid
 	this.xgap = 1.0;	// line-to-line spacing
 	this.ygap = 1.0;
-	this.lineWidth = 0.1;	// fraction of xgap used for grid-line width
-	this.lineColor = vec4.fromValues(0.1,0.5,0.1,1.0);  // RGBA green(A==opacity)
-	this.gapColor = vec4.fromValues( 0.9,0.9,0.9,1.0);  // near-white
-	this.skyColor = vec4.fromValues( 0.3,1.0,1.0,1.0);  // cyan/bright blue
+	this.lineWidth = 0.04;	// fraction of xgap used for grid-line width
+	this.lineColor = vec4.fromValues(0.5,1.0,0.5,1.0);  // RGBA green(A==opacity)
+	this.gapColor = vec4.fromValues( 0.3,0.3,0.3,1.0);  // near-white
+	this.skyColor = vec4.fromValues( 0.2,0.2,0.2,1.0);  // cyan/bright blue
 	// (use skyColor when ray does not hit anything, not even the ground-plane)
 }
 
@@ -90,7 +90,9 @@ CGeom.prototype.traceGrid = function(inRay) {
   var hitPt = vec4.fromValues(inRay.orig[0] + inRay.dir[0]*t0,
                               inRay.orig[1] + inRay.dir[1]*t0,
                               this.zGrid, 1.0);
-  // remember, hit-point x,y could be positive or negative:
+  if (hitPt[0] > 50.0 || hitPt[0] < -50.0 || hitPt[1] > 50.0 || hitPt[1] < -50.0)
+		return -1; //out of bounds
+	// remember, hit-point x,y could be positive or negative:
   var loc = hitPt[0] / this.xgap; // how many 'xgaps' from the origin?
   if(hitPt[0] < 0) loc = -loc;    // keep >0 to form double-width line at yaxis.
 //console.log("loc",loc, "loc%1", loc%1, "lineWidth", this.lineWidth);

@@ -293,7 +293,6 @@ GUIbox.prototype.mouseMove = function(mev) {
   this.camUpVec[0] = Math.cos(this.camYaw)*Math.cos(this.camPitch + Math.PI/2);
   this.camUpVec[1] = Math.sin(this.camYaw)*Math.cos(this.camPitch + Math.PI/2);
   this.camUpVec[2] = Math.sin(this.camPitch + Math.PI/2);
-
   drawAll();		// we MOVED the camera -- re-draw everything!
 }
 
@@ -475,13 +474,11 @@ GUIbox.prototype.keyDown = function(kev) {
 
   switch(kev.code) {
     case "Digit0":
-			g_partA.runMode = 0;			// RESET!
 			document.getElementById('KeyDown').innerHTML =
 			'GUIbox.KeyDown() digit 0 key.(UNUSED)';          // print on webpage,
 			console.log("digit 0 key.(UNUSED)");              // print on console.
       break;
     case "Digit1":
-			g_partA.runMode = 1;			// PAUSE!
 			document.getElementById('KeyDown').innerHTML =
 			'mguiBox.KeyDown() digit 1 key.(UNUSED)';         // print on webpage,
 			console.log("digit 1 key.(UNUSED)");              // print on console.

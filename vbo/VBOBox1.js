@@ -281,12 +281,11 @@ VBObox1.prototype.switchToMe = function () {
 }
 
 VBObox1.prototype.isReady = function() {
-//==============================================================================
-// Returns 'true' if our WebGL rendering context ('gl') is ready to render using
-// this objects VBO and shader program; else return false.
-// see: https://developer.mozilla.org/en-US/docs/Web/API/WebGLRenderingContext/getParameter
+	// Returns 'true' if our WebGL rendering context ('gl') is ready to render using
+	// this objects VBO and shader program; else return false.
+	// see: https://developer.mozilla.org/en-US/docs/Web/API/WebGLRenderingContext/getParameter
 
-var isOK = true;
+	var isOK = true;
 
   if(gl.getParameter(gl.CURRENT_PROGRAM) != this.shaderLoc)  {
     console.log(this.constructor.name +
@@ -302,25 +301,24 @@ var isOK = true;
 }
 
 VBObox1.prototype.adjust = function() {
-//==============================================================================
-// Update the GPU to newer, current values we now store for 'uniform' vars on
-// the GPU; and (if needed) update each attribute's stride and offset in VBO.
+	// Update the GPU to newer, current values we now store for 'uniform' vars on
+	// the GPU; and (if needed) update each attribute's stride and offset in VBO.
 
   // check: was WebGL context set to use our VBO & shader program?
   if(this.isReady()==false) {
         console.log('ERROR! before' + this.constructor.name +
   						'.adjust() call you needed to call this.switchToMe()!!');
   }
-/* NONE!
-	// Adjust values for our uniforms,
-  this.ModelMatrix.setRotate(g_angleNow1, 0, 0, 1);	// -spin drawing axes,
-  this.ModelMatrix.translate(0.35, -0.15, 0);						// then translate them.
-  //  Transfer new uniforms' values to the GPU:-------------
-  // Send  new 'ModelMat' values to the GPU's 'u_ModelMat1' uniform:
-  gl.uniformMatrix4fv(this.u_ModelMatrixLoc,	// GPU location of the uniform
-  										false, 										// use matrix transpose instead?
-  										this.ModelMatrix.elements);	// send data from Javascript.
-*/
+	/* NONE!
+		// Adjust values for our uniforms,
+	  this.ModelMatrix.setRotate(g_angleNow1, 0, 0, 1);	// -spin drawing axes,
+	  this.ModelMatrix.translate(0.35, -0.15, 0);						// then translate them.
+	  //  Transfer new uniforms' values to the GPU:-------------
+	  // Send  new 'ModelMat' values to the GPU's 'u_ModelMat1' uniform:
+	  gl.uniformMatrix4fv(this.u_ModelMatrixLoc,	// GPU location of the uniform
+	  										false, 										// use matrix transpose instead?
+	  										this.ModelMatrix.elements);	// send data from Javascript.
+	*/
 }
 
 VBObox1.prototype.draw = function() {
@@ -404,7 +402,3 @@ VBObox1.prototype.restore = function() {
 //
 }
 */
-
-//=============================================================================
-//=============================================================================
-//=============================================================================
