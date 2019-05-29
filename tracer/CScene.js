@@ -65,10 +65,10 @@ function CScene(imgBuf) {
   this.rayEye = new CRay();
   this.geomList = [];
   this.geomList.push(new CGeom(JT_DISK));
-  this.geomList[0].rayTranslate(0,1,1,0);
-  this.geomList[0].rayScale(2,1.5,0.8);
-  this.geomList[0].rayRotate(1,1,1,0);
-  //this.geomList.push(new CGeom(JT_GNDPLANE));
+  this.geomList[0].rayTranslate(1,4,0);
+  this.geomList[0].rayScale(1.2,1,1);
+  //this.geomList[0].rayRotate(1,1,1,0);
+  this.geomList.push(new CGeom(JT_GNDPLANE));
   console.log(this.geomList[0].world2model);
   this.skyColor = vec4.fromValues(0.2,0.2,0.2,1.0);
   this.blankColor = vec4.fromValues(0.2,0.2,0.2,1.0); // neutral gray; initial value for recursive rays

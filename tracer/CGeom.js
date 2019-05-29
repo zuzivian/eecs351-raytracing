@@ -70,9 +70,12 @@ CGeom.prototype.rayScale = function(sx, sy, sz) {
 }
 
 CGeom.prototype.trace = function(inRay) {
-	//vec3.transformMat4(inRay.orig, inRay.orig, this.world2model);
-	vec3.transformMat4(inRay.dir, inRay.dir, this.world2model);
-	
+	vec3.transformMat4(inRay.orig, inRay.orig, this.world2model);
+	var scaleRot = mat4.clone(this.world2model);
+	var trans = vec4.fromValues(-scaleRot[12], -scaleRot[13], -scaleRot[14]);
+	mat4.translate(scaleRot, scaleRot, trans);
+	vec3.transformMat4(inRay.dir, inRay.dir, scaleRot);
+
 	// not sure how to rotate and scale rays
 	switch (this.shapeType) {
 		case JT_GNDPLANE:
