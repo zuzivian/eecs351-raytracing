@@ -49,6 +49,26 @@ function CGeom(shapeSelect) {
 	// (use skyColor when ray does not hit anything, not even the ground-plane)
 }
 
+CGeom.prototype.rayLoadIdentity = function(ray) {
+	// TODO
+	return ray;
+}
+
+CGeom.prototype.rayTranslate = function(ray) {
+	// TODO
+
+}
+
+CGeom.prototype.rayRotate = function(ray) {
+	// TODO
+
+}
+
+CGeom.prototype.rayScale = function(ray) {
+	// TODO
+
+}
+
 CGeom.prototype.traceGrid = function(inRay) {
 //=============================================================================
 // Find intersection of CRay object 'inRay' with grid-plane at z== this.zGrid

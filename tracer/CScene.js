@@ -82,8 +82,10 @@ CScene.prototype.makeRayTracedImage = function(camEyePt, camAimPt, camUpVec) {
       colr = vec4.create();
       for (var a = 0; a < g_AAcode; a++) { // super sampling-x
         for (var b = 0; b < g_AAcode; b++) {  // super sampling-y
-          let x = i - 0.5 + a/g_AAcode + 0.5/g_AAcode;
-          let y = j - 0.5 + b/g_AAcode + 0.5/g_AAcode;
+          let jitterx = g_isJitter ? Math.random() : 0.5;
+          let jittery = g_isJitter ? Math.random() : 0.5;
+          let x = i - 0.5 + a/g_AAcode + jitterx/g_AAcode;
+          let y = j - 0.5 + b/g_AAcode + jittery/g_AAcode;
           this.rayCam.setEyeRay(this.rayEye, x, y);						  // create ray for pixel (i,j)
           // TODO: eventually will loop over all CGeoms in geomList
           hit = this.geomList[0].traceGrid(this.rayEye);						// trace ray to the grid
