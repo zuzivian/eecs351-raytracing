@@ -64,9 +64,14 @@ function CScene(imgBuf) {
   this.rayCam = new CCamera();	// the 3D camera that sets eyeRay values
   this.rayEye = new CRay();
   this.geomList = [];
-  this.geomList.push(new CGeom(JT_GNDPLANE));
-  this.skyColor = vec4.fromValues( 0.2,0.2,0.2,1.0);
-  this.blankColor = vec4.fromValues( 0.2,0.2,0.2,1.0); // neutral gray; initial value for recursive rays
+  this.geomList.push(new CGeom(JT_DISK));
+  this.geomList[0].rayTranslate(0,1,1,0);
+  this.geomList[0].rayScale(2,1.5,0.8);
+  this.geomList[0].rayRotate(1,1,1,0);
+  //this.geomList.push(new CGeom(JT_GNDPLANE));
+  console.log(this.geomList[0].world2model);
+  this.skyColor = vec4.fromValues(0.2,0.2,0.2,1.0);
+  this.blankColor = vec4.fromValues(0.2,0.2,0.2,1.0); // neutral gray; initial value for recursive rays
 
 }
 
@@ -88,7 +93,7 @@ CScene.prototype.makeRayTracedImage = function(camEyePt, camAimPt, camUpVec) {
           let y = j - 0.5 + b/g_AAcode + jittery/g_AAcode;
           this.rayCam.setEyeRay(this.rayEye, x, y);						  // create ray for pixel (i,j)
           // TODO: eventually will loop over all CGeoms in geomList
-          hit = this.geomList[0].traceGrid(this.rayEye);						// trace ray to the grid
+          hit = this.geomList[0].trace(this.rayEye);						// trace ray to the grid
           if(hit==0) vec4.add(colr, colr, this.geomList[0].gapColor);
     			else if (hit==1) vec4.add(colr, colr, this.geomList[0].lineColor);
     			else vec4.add(colr, colr, this.geomList[0].skyColor);
