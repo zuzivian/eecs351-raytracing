@@ -63,25 +63,37 @@ function CScene(imgBuf) {
   this.imgBuf = imgBuf;
   this.rayCam = new CCamera();	// the 3D camera that sets eyeRay values
   this.rayEye = new CRay();
-  this.shapes = [];
-  this.shapes.push(new CGeom(JT_GNDPLANE));
+  this.geomList = [];
+  this.geomList.push(new CGeom(JT_GNDPLANE));
+  this.skyColor = vec4.fromValues( 0.2,0.2,0.2,1.0);
+  this.blankColor = vec4.fromValues( 0.2,0.2,0.2,1.0); // neutral gray; initial value for recursive rays
+
 }
 
-CScene.prototype.makeRayTracedImage = function() {
+CScene.prototype.makeRayTracedImage = function(camEyePt, camAimPt, camUpVec) {
 	// Create an image by Ray-tracing.   (called when you press 'T' or 't')
   var colr = vec4.create();	// floating-point RGBA color value
 	var hit = 0, idx = 0;
 
-  this.rayCam.raylookAt(gui.camEyePt, gui.camAimPt, gui.camUpVec);
+  this.rayCam.raylookAt(camEyePt, camAimPt, camUpVec);
 
-  for(var j=0; j< this.imgBuf.ySiz; j++) {       // for the j-th row of pixels.
-  	for(var i=0; i< this.imgBuf.xSiz; i++) {	    // and the i-th pixel on that row,
-			this.rayCam.setEyeRay(this.rayEye,i,j);						  // create ray for pixel (i,j)
-			if(i==0 && j==0) console.log('eyeRay:', this.rayEye);
-			hit = this.shapes[0].traceGrid(this.rayEye);						// trace ray to the grid
-			if(hit==0) vec4.copy(colr, this.shapes[0].gapColor);
-			else if (hit==1) vec4.copy(colr, this.shapes[0].lineColor);
-			else vec4.copy(colr, this.shapes[0].skyColor);
+  for (var j=0; j< this.imgBuf.ySiz; j++) {       // for the j-th row of pixels.
+  	for (var i=0; i< this.imgBuf.xSiz; i++) {	    // and the i-th pixel on that row,
+      colr = vec4.create();
+      for (var a = 0; a < g_AAcode; a++) { // super sampling-x
+        for (var b = 0; b < g_AAcode; b++) {  // super sampling-y
+          let x = i - 0.5 + a/g_AAcode + 0.5/g_AAcode;
+          let y = j - 0.5 + b/g_AAcode + 0.5/g_AAcode;
+          this.rayCam.setEyeRay(this.rayEye, x, y);						  // create ray for pixel (i,j)
+          // TODO: eventually will loop over all CGeoms in geomList
+          hit = this.geomList[0].traceGrid(this.rayEye);						// trace ray to the grid
+          if(hit==0) vec4.add(colr, colr, this.geomList[0].gapColor);
+    			else if (hit==1) vec4.add(colr, colr, this.geomList[0].lineColor);
+    			else vec4.add(colr, colr, this.geomList[0].skyColor);
+        }
+      }
+      //console.log(colr);
+      vec4.scale(colr, colr, Math.pow(g_AAcode, -2));
 		  idx = (j*this.imgBuf.xSiz + i)*this.imgBuf.pixSiz;	// Array index at pixel (i,j)
 	  	this.imgBuf.fBuf[idx   ] = colr[0];
 	  	this.imgBuf.fBuf[idx +1] = colr[1];
