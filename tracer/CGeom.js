@@ -35,59 +35,69 @@ function CGeom(shapeSelect) {
 	if(shapeSelect == undefined) shapeSelect = JT_GNDPLANE;	// default
 	this.shapeType = shapeSelect;
 
-	this.world2model = mat4.create();	// the matrix used to transform rays from
-	                                  // 'world' coord system to 'model' coords;
-	                                  // Use this to set shape size, position,
-	                                  // orientation, and squash/stretch amount.
+	this.world2model = mat4.create();
+	this.model2world = mat4.create();
 	// Ground-plane 'Line-grid' parameters:
-	this.zGrid = -5.0;	// create line-grid on the unbounded plane at z=zGrid
+	this.zGrid = 0.0;	// create line-grid on the unbounded plane at z=zGrid
 	this.xgap = 1.0;	// line-to-line spacing
 	this.ygap = 1.0;
 	this.lineWidth = 0.04;	// fraction of xgap used for grid-line width
 	this.lineColor = vec4.fromValues(0.5,1.0,0.5,1.0);  // RGBA green(A==opacity)
-	this.gapColor = vec4.fromValues( 0.3,0.3,0.3,1.0);  // near-white
+	this.gapColor = vec4.fromValues( 0.3,0.3,0.8,1.0);  // near-white
 	this.skyColor = vec4.fromValues( 0.2,0.2,0.2,1.0);  // cyan/bright blue
 	// (use skyColor when ray does not hit anything, not even the ground-plane)
 }
 
 CGeom.prototype.rayLoadIdentity = function() {
 	this.world2model = mat4.create();
+	mat4.invert(this.model2world, this.world2model);
 }
 
 CGeom.prototype.rayTranslate = function(x, y, z) {
 	var vec = vec3.fromValues(-x, -y, -z);
 	mat4.translate(this.world2model, this.world2model, vec);
+	mat4.invert(this.model2world, this.world2model);
 }
 
 CGeom.prototype.rayRotate = function(theta, x, y, z) {
 	var axis = vec3.fromValues(x, y, z);
 	mat4.rotate(this.world2model, this.world2model, -theta, axis);
+	mat4.invert(this.model2world, this.world2model);
 }
 
 CGeom.prototype.rayScale = function(sx, sy, sz) {
 	var vec = vec3.fromValues(1/sx, 1/sy, 1/sz);
 	mat4.scale(this.world2model, this.world2model, vec);
+	mat4.invert(this.model2world, this.world2model);
 }
 
-CGeom.prototype.trace = function(inRay) {
+CGeom.prototype.trace = function(ray) {
+	// copy original ray
+	var inRay = new CRay();
+	inRay.orig = vec4.clone(ray.orig);
+	inRay.dir = vec4.clone(ray.dir);
+	// transform ray into model coordinates
 	vec3.transformMat4(inRay.orig, inRay.orig, this.world2model);
 	var scaleRot = mat4.clone(this.world2model);
 	var trans = vec4.fromValues(-scaleRot[12], -scaleRot[13], -scaleRot[14]);
 	mat4.translate(scaleRot, scaleRot, trans);
 	vec3.transformMat4(inRay.dir, inRay.dir, scaleRot);
-
-	// not sure how to rotate and scale rays
+	let hit = new CHit(null, null);
 	switch (this.shapeType) {
 		case JT_GNDPLANE:
-			return this.traceGrid(inRay);
+			hit = this.traceGrid(inRay);
 			break;
 		case JT_DISK:
-			return this.traceDisk(inRay);
+			hit = this.traceDisk(inRay);
 			break;
 		default:
-			return -1;
 			break;
 	}
+	// convert back to world coordinates
+	if (hit.pos != null) {
+		vec4.transformMat4(hit.pos, hit.pos, this.model2world);
+	}
+	return hit;
 }
 
 CGeom.prototype.traceGrid = function(inRay) {
@@ -125,54 +135,47 @@ CGeom.prototype.traceGrid = function(inRay) {
   var t0 = (this.zGrid -inRay.orig[2])/inRay.dir[2];
           // find ray/grid-plane intersection: t0 == value where ray hits plane.
   if(t0 < 0) {
-    return -1;      // ray is BEHIND eyepoint.
+    return new CHit(null, this.skyColor);      // ray is BEHIND eyepoint.
   }
   // compute the x,y,z point where inRay hit the grid-plane
   var hitPt = vec4.fromValues(inRay.orig[0] + inRay.dir[0]*t0,
                               inRay.orig[1] + inRay.dir[1]*t0,
                               this.zGrid, 1.0);
   if (hitPt[0] > 50.0 || hitPt[0] < -50.0 || hitPt[1] > 50.0 || hitPt[1] < -50.0)
-		return -1; //out of bounds
+		return new CHit(null, this.skyColor); //out of bounds
 	// remember, hit-point x,y could be positive or negative:
   var loc = hitPt[0] / this.xgap; // how many 'xgaps' from the origin?
   if(hitPt[0] < 0) loc = -loc;    // keep >0 to form double-width line at yaxis.
-//console.log("loc",loc, "loc%1", loc%1, "lineWidth", this.lineWidth);
   if(loc%1 < this.lineWidth) {    // hit a line of constant-x?
-    return 1;       // yes.
+    return new CHit(hitPt, this.lineColor);       // yes.
   }
   loc = hitPt[1] / this.ygap;     // how many 'ygaps' from origin?
   if(hitPt[1] < 0) loc = -loc;    // keep >0 to form double-width line at xaxis.
   if(loc%1 < this.lineWidth) {   // hit a line of constant-y?
-      return 1;       // yes.
+      return new CHit(hitPt, this.lineColor);       // yes.
   }
-  return 0;         // No.
+  return new CHit(hitPt, this.skyColor);         // No.
 }
-
 
 CGeom.prototype.traceDisk = function(inRay) {
 
   var t0 = (this.zGrid -inRay.orig[2])/inRay.dir[2];
-          // find ray/grid-plane intersection: t0 == value where ray hits plane.
-  if(t0 < 0) {
-    return -1;      // ray is BEHIND eyepoint.
-  }
   // compute the x,y,z point where inRay hit the grid-plane
   var hitPt = vec4.fromValues(inRay.orig[0] + inRay.dir[0]*t0,
                               inRay.orig[1] + inRay.dir[1]*t0,
                               this.zGrid, 1.0);
   if (hitPt[0]**2 + hitPt[1]**2 > 25)
-		return -1; //out of bounds
+		return new CHit(null, this.skyColor); //out of bounds
 	// remember, hit-point x,y could be positive or negative:
   var loc = hitPt[0] / this.xgap; // how many 'xgaps' from the origin?
   if(hitPt[0] < 0) loc = -loc;    // keep >0 to form double-width line at yaxis.
-//console.log("loc",loc, "loc%1", loc%1, "lineWidth", this.lineWidth);
   if(loc%1 < this.lineWidth) {    // hit a line of constant-x?
-    return 1;       // yes.
+    return new CHit(hitPt, this.lineColor);       // yes.
   }
   loc = hitPt[1] / this.ygap;     // how many 'ygaps' from origin?
   if(hitPt[1] < 0) loc = -loc;    // keep >0 to form double-width line at xaxis.
   if(loc%1 < this.lineWidth) {   // hit a line of constant-y?
-      return 1;       // yes.
+		return new CHit(hitPt, this.lineColor);      // yes.
   }
-  return 0;         // No.
+	return new CHit(hitPt, this.gapColor);      // No.
 }

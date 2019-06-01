@@ -496,7 +496,7 @@ VBObox0.prototype.adjust = function() {
   mat4.multiply(this.mvpMat, camProj, camView);
   // mvpMat now set for WORLD drawing axes.
   // Our ray-tracer's ground-plane grid is at z = zGrid = -5;
-  var trans = vec3.fromValues(0,0,-5);
+  var trans = vec3.fromValues(0,0,0);
   mat4.translate(this.mvpMat, this.mvpMat, trans );
   //  Transfer new uniforms' values to the GPU:-------------
   // Send  new 'ModelMat' values to the GPU's 'u_ModelMat1' uniform:

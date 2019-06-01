@@ -55,57 +55,62 @@ function CScene(imgBuf) {
 // --matter[0] material is a shiny red Phong-lit material, lit by lamp[0];
 // --lamp[0] is a point-light source at location (5,5,5).
 
+  this.G_AA_MAX    = 4;				// highest super-sampling number allowed.
   this.RAY_EPSILON = 1.0E-15;       // ray-tracer precision limits; treat
                                     // any value smaller than this as zero.
                                     // (why?  JS uses 52-bit mantissa;
                                     // 2^-52 = 2.22E-16, so 10^-15 gives a
                                     // safety margin of 20:1 for small # calcs)
+  this.AAcode = 1;
+  this.isJitter = 0;
   this.imgBuf = imgBuf;
   this.rayCam = new CCamera();	// the 3D camera that sets eyeRay values
   this.rayEye = new CRay();
   this.geomList = [];
-  this.geomList.push(new CGeom(JT_DISK));
-  this.geomList[0].rayTranslate(1,4,0);
-  this.geomList[0].rayScale(1.2,1,1);
-  //this.geomList[0].rayRotate(1,1,1,0);
   this.geomList.push(new CGeom(JT_GNDPLANE));
-  console.log(this.geomList[0].world2model);
-  this.skyColor = vec4.fromValues(0.2,0.2,0.2,1.0);
-  this.blankColor = vec4.fromValues(0.2,0.2,0.2,1.0); // neutral gray; initial value for recursive rays
-
+  this.geomList.push(new CGeom(JT_DISK));
+  //this.geomList[1].rayTranslate(1,1,0);
+  //this.geomList[1].rayScale(1.5,1,1);
+  this.geomList[1].rayRotate(0.8,0,1,0);
 }
 
 CScene.prototype.makeRayTracedImage = function(camEyePt, camAimPt, camUpVec) {
 	// Create an image by Ray-tracing.   (called when you press 'T' or 't')
   var colr = vec4.create();	// floating-point RGBA color value
 	var hit = 0, idx = 0;
-
+  // set the correct Camera viewing frustrum
   this.rayCam.raylookAt(camEyePt, camAimPt, camUpVec);
-
+  // ray trace each pixel and determine the resultant color
   for (var j=0; j< this.imgBuf.ySiz; j++) {       // for the j-th row of pixels.
-  	for (var i=0; i< this.imgBuf.xSiz; i++) {	    // and the i-th pixel on that row,
-      colr = vec4.create();
-      for (var a = 0; a < g_AAcode; a++) { // super sampling-x
-        for (var b = 0; b < g_AAcode; b++) {  // super sampling-y
-          let jitterx = g_isJitter ? Math.random() : 0.5;
-          let jittery = g_isJitter ? Math.random() : 0.5;
-          let x = i - 0.5 + a/g_AAcode + jitterx/g_AAcode;
-          let y = j - 0.5 + b/g_AAcode + jittery/g_AAcode;
-          this.rayCam.setEyeRay(this.rayEye, x, y);						  // create ray for pixel (i,j)
-          // TODO: eventually will loop over all CGeoms in geomList
-          hit = this.geomList[0].trace(this.rayEye);						// trace ray to the grid
-          if(hit==0) vec4.add(colr, colr, this.geomList[0].gapColor);
-    			else if (hit==1) vec4.add(colr, colr, this.geomList[0].lineColor);
-    			else vec4.add(colr, colr, this.geomList[0].skyColor);
-        }
-      }
-      //console.log(colr);
-      vec4.scale(colr, colr, Math.pow(g_AAcode, -2));
-		  idx = (j*this.imgBuf.xSiz + i)*this.imgBuf.pixSiz;	// Array index at pixel (i,j)
-	  	this.imgBuf.fBuf[idx   ] = colr[0];
-	  	this.imgBuf.fBuf[idx +1] = colr[1];
-	  	this.imgBuf.fBuf[idx +2] = colr[2];
-  	}
-	}
+    for (var i=0; i< this.imgBuf.xSiz; i++) {	    // and the i-th pixel on that row,
+      var colr = this.getPixelColor(i, j); // get color at pixel (i,j)
+      this.imgBuf.fBuf[idx   ] = colr[0];  // set color in floating-point buffer
+      this.imgBuf.fBuf[idx +1] = colr[1];
+      this.imgBuf.fBuf[idx +2] = colr[2];
+      idx += this.imgBuf.pixSiz;	// incr Array index at pixel (i,j)
+    }
+  }
 	this.imgBuf.float2int();		// create integer image from floating-point buffer.
+}
+
+
+CScene.prototype.getPixelColor = function(i, j) {
+  colr = vec4.create();
+  for (var a = 0; a < this.AAcode; a++) { // super sampling-x
+    for (var b = 0; b < this.AAcode; b++) {  // super sampling-y
+      let jitter_x = this.isJitter ? Math.random() : 0.5; // jitter x
+      let jitter_y = this.isJitter ? Math.random() : 0.5; // jitter y
+      let x = i - 0.5 + a/this.AAcode + jitter_x/this.AAcode; // get x value of ray
+      let y = j - 0.5 + b/this.AAcode + jitter_y/this.AAcode; // get y value of ray
+
+      this.rayCam.setEyeRay(this.rayEye, x, y); // create ray for sub-pixel at (x,y)
+      let hits = new CHitList(this.rayEye);
+      for (let c = 0; c < this.geomList.length; c++) {
+        hits.push(this.geomList[c].trace(this.rayEye));
+      }
+      vec4.add(colr, colr, hits.getNearestColor()); // determine subpixel color
+    }
+  }
+  vec4.scale(colr, colr, Math.pow(this.AAcode, -2)); // average colors over each subpixel
+  return colr;
 }
