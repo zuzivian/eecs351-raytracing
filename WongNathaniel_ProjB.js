@@ -20,8 +20,7 @@ var gui = new GUIbox(); // Holds all (Graphical) User Interface fcns & vars
 var preView = new VBObox0();		// For WebGLpreview: holds one VBO and its shaders
 var rayView = new VBObox1();		// for displaying the ray-tracing results.
 //-----------Ray Tracer Objects:---------------
-var g_myPic = new CImgBuf(256,256); // Create a floating-point image-buffer
-var g_myScene = new CScene(g_myPic); // Create our ray-tracing object;
+var g_myScene = new CScene(new CImgBuf(256,256)); // Create our ray-tracing object;
 var G_SCENE_MAX = 4;		// Number of scenes defined.
 var g_SceneNum = 0;			// scene-selector number; 0,1,2,... G_SCENE_MAX-1
 
@@ -40,6 +39,9 @@ function main() {
   gl.enable(gl.DEPTH_TEST);           // CAREFUL! don't do depth tests for 2D!
 
   gui.init();                   // Register all Mouse & Keyboard Event-handlers
+
+  g_myScene.setImgBuf(new CImgBuf(256,256));
+  g_myScene.initScene(g_SceneNum);
 
   // Initialize each of our 'vboBox' objects:
   preView.init(gl);		// VBO + shaders + uniforms + attribs for WebGL preview
@@ -109,8 +111,7 @@ function onSceneButton() {
 	else g_SceneNum = g_SceneNum +1;
 	document.getElementById('SceneReport').innerHTML = 'Scene Number ' + g_SceneNum;
   // Change g_myPic contents:
-  g_myPic.setTestPattern(g_SceneNum);
-  // transfer g_myPic's new contents to the GPU;
+  g_myScene.initScene(g_SceneNum);
   rayView.switchToMe(); // be sure OUR VBO & shaders are in use, then
   rayView.reload();     // re-transfer VBO contents and texture-map contents
   drawAll();

@@ -11,24 +11,25 @@ function CHitList(ray) {
   // (each point is in front of the ray, not behind it; t>0).
 
   this.ray = ray;
-  this.pierce = [ new CHit( null, vec4.fromValues( 0.2,0.2,0.2,1.0) ) ];
+  this.pierce = [ new CHit() ];
 
   this.iNearest = 0; // index of CHit object nearest the ray's origin point.
 }
 
-CHitList.prototype.push = function(hit) {
-  this.pierce.push(hit);
+CHitList.prototype.extend = function() {
+  this.pierce.push(new CHit());
+  return this.pierce[this.pierce.length-1];
 }
 
 CHitList.prototype.findDistance = function(hit) {
-  if (hit.pos == null) return Infinity;
-  let a = this.ray.orig, b = hit.pos;
-  return Math.sqrt( (a[0]-b[0])**2 + (a[1]-b[1])**2 + (a[2]-b[2])**2 );
+  if (hit.hitPt == null) return Infinity;
+  let a = this.ray.orig, b = hit.hitPt;
+  return Math.sqrt( Math.pow(a[0]-b[0],2) + Math.pow(a[1]-b[1], 2) + Math.pow(a[2]-b[2],2) );
 }
 
 CHitList.prototype.findNearest = function() {
   for (let i=0; i < this.pierce.length; i++) {
-    if (this.pierce[i].pos == null) continue; // not a valid point
+    if (this.pierce[i].hitPt == null) continue; // not a valid point
     if (this.findDistance(this.pierce[i]) < this.findDistance(this.pierce[this.iNearest])) {
       this.iNearest = i;
     }
@@ -37,5 +38,5 @@ CHitList.prototype.findNearest = function() {
 
 CHitList.prototype.getNearestColor = function() {
   this.findNearest();
-  return this.pierce[this.iNearest].color;
+  return this.pierce[this.iNearest].colr;
 }

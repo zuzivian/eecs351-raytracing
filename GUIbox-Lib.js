@@ -180,20 +180,20 @@ GUIbox.prototype.init = function() {
   // I limited 'pitch' to +/- 90 deg (+/- PI/2 radians) to avoid confusing
 	// counter-intuitive images possible with past-vertical pitch.
 	// (see GUIbox.mouseMove() function )
-  this.camYaw = Math.PI/2.0;              // (initially I aim in +y direction)
+  this.camYaw = 0.5*Math.PI;              // (initially I aim in +y direction)
                               // Yaw angle (radians) measured from world +x
                               // direction to the x,y components of the camera's
                               // aiming direction.
                               // HORIZONTAL mouse-drag increases/decreases this.
   this.camYawInit = this.camYaw;  // save initial value for use in mouseMove().
-  this.camPitch = -Math.PI/2;             // (initially I look straight down)
+  this.camPitch = -0.05*Math.PI;             // (initially I look straight down)
                               // Pitch angle (radians) measured upwards from the
                               // horizon (the xy plane at camera's eyepoint z)
                               // upwards to the camera's aiming direction.
                               // VERTICAL mouse-drag increases/decreases this.
   this.camPitchInit = this.camPitch;  // save initial value for mouseMove().
-  this.camEyePt = vec4.fromValues(0,0,5,1); // initial camera position
-  this.camAimPt = vec3.fromValues(       // point on yaw-pitch sphere around eye:
+  this.camEyePt = vec4.fromValues(0,-8,3,1); // initial camera position
+  this.camAimPt = vec4.fromValues(       // point on yaw-pitch sphere around eye:
                 this.camEyePt[0] + Math.cos(this.camYaw)*Math.cos(this.camPitch), // x
                 this.camEyePt[1] + Math.sin(this.camYaw)*Math.cos(this.camPitch), // y
                 this.camEyePt[2] + Math.sin(this.camPitch),  // z
@@ -206,6 +206,13 @@ GUIbox.prototype.init = function() {
                             Math.sin(this.camPitch + Math.PI/2),  // z
       1.0);   // w
   this.camSpeed = 0.5;	      // world-space distance moved per keystroke
+  this.camFovy  = 45.0;   // vertical field-of-view in degrees, measured from
+                          // bottom to top of camera image.
+  this.camAspect = 1.0;   // camera-image width/height (sets horizontal FOV)
+  this.camNear = 1.0;     // distance from Center of Projection to viewing plane
+                          // (where we define left,bot,top values from Fovy & aspect)
+  this.camFar = 10000;    // distance to frustum's outermost clipping plane
+                          // (for WebGL camera only--ignored by ray-tracer)
 }
 
 GUIbox.prototype.mouseDown = function(mev) {

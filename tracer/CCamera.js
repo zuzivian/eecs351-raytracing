@@ -136,6 +136,18 @@ function CCamera() {
 	this.vfrac = (this.iTop   - this.iBot ) / this.ymax;	// pixel tile's height.
 }
 
+CCamera.prototype.setSize = function(xmax, ymax) {
+	this.xmax = 256;			// horizontal,
+	this.ymax = 256;			// vertical image resolution.
+	// To ray-trace an image of xmax,ymax pixels, divide this rectangular image
+	// plane into xmax,ymax rectangular tiles, and shoot eye-rays from the camera's
+	// center-of-projection through those tiles to find scene color values.
+
+	// Divide the image plane into rectangular tiles, one for each pixel:
+	this.ufrac = (this.iRight - this.iLeft) / this.xmax;	// pixel tile's width
+	this.vfrac = (this.iTop   - this.iBot ) / this.ymax;	// pixel tile's height.
+}
+
 CCamera.prototype.rayFrustum = function(left, right, bot, top, near) {
 	//==============================================================================
 	// Set the camera's viewing frustum with the same arguments used by the OpenGL
@@ -153,6 +165,9 @@ CCamera.prototype.rayFrustum = function(left, right, bot, top, near) {
   this.iBot = bot;
   this.iTop = top;
   this.iNear = near;
+
+	this.ufrac = (this.iRight - this.iLeft) / this.xmax;	// pixel tile's width
+	this.vfrac = (this.iTop   - this.iBot ) / this.ymax;	// pixel tile's height.
 }
 
 CCamera.prototype.rayPerspective = function(fovy, aspect, zNear) {
@@ -163,12 +178,16 @@ CCamera.prototype.rayPerspective = function(fovy, aspect, zNear) {
 	//  fovy == vertical field-of-view (bottom-to-top) in degrees
 	//  aspect ratio == camera image width/height
 	//  zNear == distance from COP to the image-forming plane. zNear MUST be >0.
-	/// UNTESTED!!
-  this.iNear = zNear;
-  this.iTop = zNear * Math.tan(0.5*fovy*(Math.PI/180.0)); // tan(radians)
-  this.iBot = -iTop;
-  this.iRight = iTop*aspect;
-  this.iLeft = -iRight;
+
+	this.iNear = zNear;
+	this.iTop = zNear * Math.tan(0.5*fovy*(Math.PI/180.0)); // tan(radians)
+	// right triangle:  iTop/zNear = sin(fovy/2) / cos(fovy/2) == tan(fovy/2)
+	this.iBot = -this.iTop;
+	this.iRight = this.iTop*aspect;
+	this.iLeft = -this.iRight;
+
+	this.ufrac = (this.iRight - this.iLeft) / this.xmax;	// pixel tile's width
+	this.vfrac = (this.iTop   - this.iBot ) / this.ymax;	// pixel tile's height.
 }
 
 CCamera.prototype.raylookAt = function(eyePt, aimPt, upVec) {
@@ -179,46 +198,20 @@ CCamera.prototype.raylookAt = function(eyePt, aimPt, upVec) {
 	// Each argument (eyePt, aimPt, upVec) is a glMatrix 'vec3' object.
 
 	vec4.copy(this.eyePt, eyePt);
-  vec3.subtract(this.nAxis, eyePt, aimPt);  // aim-eye == MINUS N-axis direction
-  vec3.normalize(this.nAxis, this.nAxis);   // N-axis must have unit length.
+  vec4.subtract(this.nAxis, eyePt, aimPt);  // aim-eye == MINUS N-axis direction
+  vec4.normalize(this.nAxis, this.nAxis);   // N-axis must have unit length.
   vec3.cross(this.uAxis, upVec, this.nAxis);  // U-axis == upVec cross N-axis
-  vec3.normalize(this.uAxis, this.uAxis);   // make it unit-length.
+  vec4.normalize(this.uAxis, this.uAxis);   // make it unit-length.
   vec3.cross(this.vAxis, this.nAxis, this.uAxis); // V-axis == N-axis cross U-axis
-
+	vec4.normalize(this.vAxis, this.vAxis);   // make it unit-length.
 }
 
-CCamera.prototype.setEyeRay = function(myeRay, xpos, ypos) {
+CCamera.prototype.setEyeRay = function(eyeRay, xpos, ypos) {
 	//=============================================================================
 	// Set values of a CRay object to specify a ray in world coordinates that
 	// originates at the camera's eyepoint (its center-of-projection: COP) and aims
 	// in the direction towards the image-plane location (xpos,ypos) given in units
-	// of pixels.  The ray's direction vector is *NOT* normalized.
-	//
-	// !CAREFUL! Be SURE you understand these floating-point xpos,ypos arguments!
-	// For the default CCamera (+/-45 degree FOV, xmax,ymax == 256x256 resolution)
-	// the function call makeEyeRay(0,0) creates a ray to the image rectangle's
-	// lower-left-most corner at U,V,N = (iLeft,iBot,-1), and the function call
-	// makeEyeRay(256,256) creates a ray to the image rectangle's upper-left-most
-	// corner at U,V,N = (iRight,iTop,-1).
-	//	To get the eye ray for pixel (x,y), DON'T call setEyeRay(myRay, x,y);
-	//                                   instead call setEyeRay(myRay,x+0.5,y+0.5)
-	// (Later you will trace multiple eye-rays per pixel to implement antialiasing)
-	// WHY?
-	//	-- because the half-pixel offset (x+0.5, y+0.5) traces the ray through the
-	//     CENTER of the pixel's tile, and not its lower-left corner.
-	// As we learned in class (and from optional reading "A Pixel is Not a Little
-	// Square" by Alvy Ray Smith), a pixel is NOT a little square -- it is a
-	// point-like location, one of many in a grid-like arrangement, where we store
-	// a neighborhood summary of an image's color(s).  While we could (and often
-	// do) define that pixel's 'neighborhood' as a small tile of the image plane,
-	// and summarize its color as the tile's average color, it is not our only
-	// choice and certainly not our best choice.
-	// (ASIDE: You can dramatically improve the appearance of a digital image by
-	//     making pixels  that summarize overlapping tiles by making a weighted
-	//     average for the neighborhood colors, with maximum weight at the pixel
-	//     location, and with weights that fall smoothly to zero as you reach the
-	//     outer limits of the pixel's tile or 'neighborhood'. Google: antialiasing
-	//     bilinear filter, Mitchell-Netravali piecewise bicubic prefilter, etc).
+	// of pixels.
 
 	// Convert image-plane location (xpos,ypos) in the camera's U,V,N coords:
 	var posU = this.iLeft + xpos*this.ufrac; 	// U coord,
@@ -226,17 +219,17 @@ CCamera.prototype.setEyeRay = function(myeRay, xpos, ypos) {
 	//  and the N coord is always -1, at the image-plane (zNear) position.
 	// Then convert this point location to world-space X,Y,Z coords using our
 	// camera's unit-length coordinate axes uAxis,vAxis,nAxis
- 	xyzPos = vec4.create();    // make vector 0,0,0,0.
+ 	var xyzPos = vec4.create();    // make vector 0,0,0,0.
 	vec4.scaleAndAdd(xyzPos, xyzPos, this.uAxis, posU); // xyzPos += Uaxis*posU;
-	vec4.scaleAndAdd(xyzPos, xyzPos, this.vAxis, posV); // xyzPos += Vaxis*posU;
-  vec4.scaleAndAdd(xyzPos, xyzPos, this.nAxis, -this.iNear);
-  // 																								xyzPos += Naxis * (-1)
+	vec4.scaleAndAdd(xyzPos, xyzPos, this.vAxis, posV); // xyzPos += Vaxis*posV;
+  vec4.scaleAndAdd(xyzPos, xyzPos, this.nAxis, -this.iNear);   //	xyzPos += Naxis * (-1)
+	vec4.normalize(xyzPos, xyzPos);
   // The eyeRay we want consists of just 2 world-space values:
   //  	-- the ray origin == camera origin == eyePt in XYZ coords
   //		-- the ray direction TO image-plane point FROM ray origin;
   //				myeRay.dir = (xyzPos + eyePt) - eyePt = xyzPos; thus
-	vec4.copy(myeRay.orig, this.eyePt);
-	vec4.copy(myeRay.dir, xyzPos);
+	vec4.copy(eyeRay.orig, this.eyePt);
+	vec4.copy(eyeRay.dir, xyzPos);
 }
 
 CCamera.prototype.printMe = function() {

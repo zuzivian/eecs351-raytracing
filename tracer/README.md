@@ -68,3 +68,41 @@ The CScene object also contains & uses:
 - CGeom	== a 3D geometric shape object for ray-tracing (implicit function).
 - CHit == an object that describes how 1 ray pierced the surface of 1 shape;
 - CHitList == Array of all CHit objects for 1 ray traced thru entire CScene.
+
+## The CScene class includes:
+- One CImgBuf object that holds a floating-point RGB image, and uses that
+		  image to create a corresponding 8,8,8 bit RGB image suitable for WebGL
+			display as a texture-map in an HTML-5 canvas object within a webpage.
+- One CCamera object that describes an antialiased ray-tracing camera;
+     in my code, it is the 'rayCam' variable within the CScene prototype.
+     The CCamera class defines the SOURCE of rays we trace from our eyepoint
+     into the scene, and uses those rays to set output image pixel values.
+- One CRay object 'eyeRay' that describes the ray we're currently tracing from
+     eyepoint into the scene.
+- One CHitList object 'eyeHits' that describes each 3D point where 'eyeRay'
+     pierces a shape (a CGeom object) in our CScene.  Each CHitList object
+     in our ray-tracer holds a COLLECTION of hit-points (CHit objects) for a
+     ray, and keeps track of which hit-point is closest to the camera. That
+			collection is held in the eyeHits member of the CScene class.
+- a COLLECTION of CGeom objects: each describe an individual visible thing; a
+     single item or thing we may see in the scene.  That collection is the
+			held in the 'item[]' array within the CScene class.
+     		Each CGeom element in the 'item[]' array holds one shape on-screen.
+     To see three spheres and a ground-plane we'll have 4 CGeom objects, one
+			for each of the spheres, and one for the ground-plane.
+     Each CGeom obj. includes a 'matlIndex' index number that selects which
+     material to use in rendering the CGeom shape. I assume ALL lights in a
+     scene may affect ALL CGeom shapes, but you may wish to add an light-src
+     index to permit each CGeom object to choose which lights(s) affect it.
+- a COLLECTION of CMatl objects; each describes one light-modifying material'
+     hold this collection in  'matter[]' array within the CScene class).
+     Each CMatl element in the 'matter[]' array describes one particular
+     individual material we will use for one or more CGeom shapes. We may
+     have one CMatl object that describes clear glass, another for a
+     Phong-shaded brass-metal material, another for a texture-map, another
+     for a bump mapped material for the surface of an orange (fruit),
+     another for a marble-like material defined by Perlin noise, etc.
+- a COLLECTION of CLight objects that each describe one light source.
+			That collection is held in the 'lamp[]' array within the CScene class.
+     Note that I apply all lights to all CGeom objects.  You may wish to add
+     an index to the CGeom class to select which lights affect each item.

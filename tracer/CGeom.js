@@ -10,7 +10,7 @@ const JT_CYLINDER = 3;    // A cylinder with user-settable radius at each end
                         // radius at each end makes a disk.
 const JT_TRIANGLE = 4;    // a triangle with 3 vertices.
 const JT_BLOBBIES = 5;    // Implicit surface:Blinn-style Gaussian 'blobbies'.
-const JT_DISK = 5;    // Implicit surface:Blinn-style Gaussian 'blobbies'.
+const JT_DISK = 5;    // 2D disk on z-plane
 
 
 function CGeom(shapeSelect) {
@@ -20,162 +20,323 @@ function CGeom(shapeSelect) {
 // different kinds of shapes by setting the 'shapeType' member.  CGeom can
 // describe ANY shape, including sphere, box, cone, quadric, etc. and it holds
 // all/any variables needed for each shapeType.
-//
-// Advanced Version: try it!
-//        Ray tracing lets us position and distort these shapes in a new way;
-// instead of transforming the shape itself for 'hit' testing against a traced
-// ray, we transform the 3D ray by the matrix 'world2model' before a hit-test.
-// This matrix simplifies our shape descriptions, because we don't need
-// separate parameters for position, orientation, scale, or skew.  For example,
-// JT_SPHERE and JT_BOX need NO parameters--they each describe a unit sphere or
-// unit cube centered at the origin.  To get a larger, rotated, offset sphere
-// or box, just set the parameters in world2model matrix. Note that you can
-// scale the box or sphere differently in different directions, forming
-// ellipsoids for the unit sphere and rectangles (or prisms) from the unit box.
+
 	if(shapeSelect == undefined) shapeSelect = JT_GNDPLANE;	// default
 	this.shapeType = shapeSelect;
-
-	this.world2model = mat4.create();
+	switch(this.shapeType) {
+	  case JT_GNDPLANE: //--------------------------------------------------------
+	    //set the ray-tracing function (so we call it using item[i].traceMe() )
+    	this.xgap = 1.0;	// line-to-line spacing
+    	this.ygap = 1.0;
+    	this.lineWidth = 0.08;	// fraction of xgap used for grid-line width
+			this.lineColor = vec4.fromValues(0.5,1.0,0.5,1.0);
+			this.gapColor = vec4.fromValues( 0.8,0.7,1.0,1.0);
+			this.trace = function(inR,hit) { this.traceGrid(inR,hit);   };
+	    break;
+	  case JT_DISK: //------------------------------------------------------------
+	    //set the ray-tracing function (so we call it using item[i].traceMe() )
+	    this.diskRad = 2.0;   // default radius of disk centered at origin
+    	this.xgap = 61/107;	// line-to-line spacing: a ratio of primes.
+    	this.ygap = 61/107;
+    	this.lineWidth = 0.1;	// fraction of xgap used for grid-line width
+			this.lineColor = vec4.fromValues(0.5,1.0,0.5,1.0);
+			this.gapColor = vec4.fromValues( 0.3,0.3,0.8,1.0);
+			this.trace = function(inR,hit) { this.traceDisk(inR,hit);   };
+	    break;
+	  case JT_SPHERE: //----------------------------------------------------------
+	    //set the ray-tracing function (so we call it using item[i].traceMe() )
+    	this.color = vec4.fromValues(1.0,0.0,0.0,1.0);  // RGBA red(A==opacity)
+			this.trace = function(inR,hit) { this.traceSphere(inR,hit);   };
+	    break;
+		case JT_BOX: //----------------------------------------------------------
+			//set the ray-tracing function (so we call it using item[i].traceMe() )
+			this.color = vec4.fromValues(0.0,1.0,0.0,1.0);  // RGBA blue
+			this.trace = function(inR,hit) { this.traceCube(inR,hit);   };
+			break;
+		case JT_CYLINDER: //----------------------------------------------------------
+			//set the ray-tracing function (so we call it using item[i].traceMe() )
+			this.color = vec4.fromValues(0.0,0.0,1.0,1.0);  // RGBA green
+			this.trace = function(inR,hit) { this.traceCylinder(inR,hit);   };
+			break;
+	  default:
+	    console.log("CGeom() constructor: ERROR! INVALID shapeSelect:", shapeSelect);
+	    return;
+	    break;
+	}
+	// Ray transform matrices.
+  this.normal2world = mat4.create();    // == worldRay2model^T
+                                    // This matrix transforms MODEL-space
+                                    // normals (where they're easy to find)
+                                    // to WORLD-space coords (where we need
+                                    // them for lighting calcs.)
+	this.worldRay2model = mat4.create();
 	this.model2world = mat4.create();
 	// Ground-plane 'Line-grid' parameters:
-	this.zGrid = 0.0;	// create line-grid on the unbounded plane at z=zGrid
-	this.xgap = 1.0;	// line-to-line spacing
-	this.ygap = 1.0;
-	this.lineWidth = 0.04;	// fraction of xgap used for grid-line width
-	this.lineColor = vec4.fromValues(0.5,1.0,0.5,1.0);  // RGBA green(A==opacity)
-	this.gapColor = vec4.fromValues( 0.3,0.3,0.8,1.0);  // near-white
-	this.skyColor = vec4.fromValues( 0.2,0.2,0.2,1.0);  // cyan/bright blue
-	// (use skyColor when ray does not hit anything, not even the ground-plane)
 }
 
-CGeom.prototype.rayLoadIdentity = function() {
-	this.world2model = mat4.create();
-	mat4.invert(this.model2world, this.world2model);
+CGeom.prototype.setIdent = function() {
+//==============================================================================
+// Discard worldRay2model contents, replace with identity matrix (world==model).
+  mat4.identity(this.worldRay2model);
+  mat4.identity(this.normal2world);
 }
 
-CGeom.prototype.rayTranslate = function(x, y, z) {
-	var vec = vec3.fromValues(-x, -y, -z);
-	mat4.translate(this.world2model, this.world2model, vec);
-	mat4.invert(this.model2world, this.world2model);
+CGeom.prototype.rayTranslate = function(x,y,z) {
+//==============================================================================
+//  Translate ray-tracing's current drawing axes (defined by worldRay2model),
+//  by the vec3 'offV3' vector amount
+  var a = mat4.create();   // construct INVERSE translation matrix [T^-1]
+  a[12] = -x; // x
+  a[13] = -y; // y
+  a[14] = -z; // z.
+  //print_mat4(a,'translate()');
+  mat4.multiply(this.worldRay2model,      // [new] =
+                a, this.worldRay2model);  // =[T^-1]*[OLD]
+  mat4.transpose(this.normal2world, this.worldRay2model); // model normals->world
 }
 
-CGeom.prototype.rayRotate = function(theta, x, y, z) {
-	var axis = vec3.fromValues(x, y, z);
-	mat4.rotate(this.world2model, this.world2model, -theta, axis);
-	mat4.invert(this.model2world, this.world2model);
+CGeom.prototype.rayRotate = function(rad, ax, ay, az) {
+//==============================================================================
+// Rotate ray-tracing's current drawing axes (defined by worldRay2model) around
+// the vec3 'axis' vector by 'rad' radians.
+// (almost all of this copied directly from glMatrix mat4.rotate() function)
+    var x = ax, y = ay, z = az,
+        len = Math.sqrt(x * x + y * y + z * z),
+        s, c, t,
+        b00, b01, b02,
+        b10, b11, b12,
+        b20, b21, b22;
+    if (Math.abs(len) < glMatrix.GLMAT_EPSILON) {
+      console.log("CGeom.rayRotate() ERROR!!! zero-length axis vector!!");
+      return null;
+      }
+    len = 1 / len;
+    x *= len;
+    y *= len;
+    z *= len;
+
+    s = Math.sin(-rad);     // INVERSE rotation; use -rad, not rad
+    c = Math.cos(-rad);
+    t = 1 - c;
+    // Construct the elements of the 3x3 rotation matrix. b_rowCol
+    // CAREFUL!  I changed something!!
+    /// glMatrix mat4.rotate() function constructed the TRANSPOSE of the
+    // matrix we want (probably because they used these b_rowCol values for a
+    // built-in matrix multiply).
+    // What we want is given in https://en.wikipedia.org/wiki/Rotation_matrix at
+    //  the section "Rotation Matrix from Axis and Angle", and thus
+    // I swapped the b10, b01 values; the b02,b20 values, the b21,b12 values.
+    b00 = x * x * t + c;     b01 = x * y * t - z * s; b02 = x * z * t + y * s;
+    b10 = y * x * t + z * s; b11 = y * y * t + c;     b12 = y * z * t - x * s;
+    b20 = z * x * t - y * s; b21 = z * y * t + x * s; b22 = z * z * t + c;
+    var b = mat4.create();  // build 4x4 rotation matrix from these
+    b[ 0] = b00; b[ 4] = b01; b[ 8] = b02; b[12] = 0.0; // row0
+    b[ 1] = b10; b[ 5] = b11; b[ 9] = b12; b[13] = 0.0; // row1
+    b[ 2] = b20; b[ 6] = b21; b[10] = b22; b[14] = 0.0; // row2
+    b[ 3] = 0.0; b[ 7] = 0.0; b[11] = 0.0; b[15] = 1.0; // row3
+//    print_mat4(b,'rotate()');
+    mat4.multiply(this.worldRay2model,      // [new] =
+                  b, this.worldRay2model);  // [R^-1][old]
+  mat4.transpose(this.normal2world, this.worldRay2model); // model normals->world
+
 }
 
-CGeom.prototype.rayScale = function(sx, sy, sz) {
-	var vec = vec3.fromValues(1/sx, 1/sy, 1/sz);
-	mat4.scale(this.world2model, this.world2model, vec);
-	mat4.invert(this.model2world, this.world2model);
+CGeom.prototype.rayScale = function(sx,sy,sz) {
+//==============================================================================
+//  Scale ray-tracing's current drawing axes (defined by worldRay2model),
+//  by the vec3 'scl' vector amount
+  if(Math.abs(sx) < glMatrix.GLMAT_EPSILON ||
+     Math.abs(sy) < glMatrix.GLMAT_EPSILON ||
+     Math.abs(sz) < glMatrix.GLMAT_EPSILON) {
+     console.log("CGeom.rayScale() ERROR!! zero-length scale!!!");
+     return null;
+     }
+  var c = mat4.create();   // construct INVERSE scale matrix [S^-1]
+  c[ 0] = 1/sx; // x
+  c[ 5] = 1/sy; // y
+  c[10] = 1/sz; // z.
+//  print_mat4(c, 'scale()')'
+  mat4.multiply(this.worldRay2model,      // [new] =
+                c, this.worldRay2model);  // =[S^-1]*[OLD]
+  mat4.transpose(this.normal2world, this.worldRay2model); // model normals->world
 }
 
-CGeom.prototype.trace = function(ray) {
-	// copy original ray
-	var inRay = new CRay();
-	inRay.orig = vec4.clone(ray.orig);
-	inRay.dir = vec4.clone(ray.dir);
-	// transform ray into model coordinates
-	vec3.transformMat4(inRay.orig, inRay.orig, this.world2model);
-	var scaleRot = mat4.clone(this.world2model);
-	var trans = vec4.fromValues(-scaleRot[12], -scaleRot[13], -scaleRot[14]);
-	mat4.translate(scaleRot, scaleRot, trans);
-	vec3.transformMat4(inRay.dir, inRay.dir, scaleRot);
-	let hit = new CHit(null, null);
-	switch (this.shapeType) {
-		case JT_GNDPLANE:
-			hit = this.traceGrid(inRay);
-			break;
-		case JT_DISK:
-			hit = this.traceDisk(inRay);
-			break;
-		default:
-			break;
+
+CGeom.prototype.traceGrid = function(inRay, myHit) {
+	//==============================================================================
+	// Find intersection of CRay object 'inRay' with grid-plane at z== 0, and
+	// if we find a ray/grid intersection CLOSER than CHit object 'hitMe', update
+	// the contents of 'hitMe' with all the new hit-point information.
+	// NO return value.
+
+	//Transform 'inRay' by this.worldRay2model matrix;
+  var rayT = this.getModelRay(inRay);
+
+  // find ray/grid-plane intersection: t0 == value where ray hits plane at z=0.
+  var t0 = (-rayT.orig[2])/rayT.dir[2];
+  if(t0 < 0 || t0 > myHit.t0) return;
+
+  // YES! we found a better hit-point!
+	this.setHitPt(myHit, t0, inRay, rayT); 	// set up hitpoint data
+  vec4.transformMat4(myHit.surfNorm, vec4.fromValues(0,0,1,0), this.normal2world);
+
+  // FIND COLOR at model-space hit-point---------------------------------
+  var loc = myHit.modelHitPt[0] / this.xgap; // how many 'xgaps' from the origin?
+  if(myHit.modelHitPt[0] < 0) loc = -loc;    // keep >0 to form double-width line at yaxis.
+//console.log("loc",loc, "loc%1", loc%1, "lineWidth", this.lineWidth);
+  if(loc%1 < this.lineWidth) {    // fractional part of loc < linewidth?
+		myHit.calcLighting(inRay, this.lineColor); 	// calculate lighting
+    return;
+  }
+  loc = myHit.modelHitPt[1] / this.ygap;     // how many 'ygaps' from origin?
+  if(myHit.modelHitPt[1] < 0) loc = -loc;    // keep >0 to form double-width line at xaxis.
+  if(loc%1 < this.lineWidth) {    // fractional part of loc < linewidth?
+		myHit.calcLighting(inRay, this.lineColor); 	// calculate lighting
+    return;
+  }
+	myHit.calcLighting(inRay, this.gapColor); 	// calculate lighting
+  return;
+}
+
+CGeom.prototype.traceDisk = function(inRay, myHit) {
+	// Find intersection of CRay object 'inRay' with a flat, circular disk in the
+	// xy plane, centered at the origin, with radius this.diskRad,
+	// and store the ray/disk intersection information on CHit object 'hitMe'.
+	// NO return value.
+
+  //Transform 'inRay' by this.worldRay2model matrix;
+  var rayT = this.getModelRay(inRay);
+
+  // find ray/disk intersection: t0 == value where ray hits the plane at z=0.
+  var t0 = -rayT.orig[2]/rayT.dir[2];   // (disk is in z==0 plane)
+  if(t0 < 0 || t0 > myHit.t0) return;
+  var modelHit = vec4.create();
+  vec4.scaleAndAdd(modelHit, rayT.orig, rayT.dir, t0);
+  if(modelHit[0]*modelHit[0] + modelHit[1]*modelHit[1] > this.diskRad**2) return;
+	// YES! we found a better hit-point!
+	this.setHitPt(myHit, t0, inRay, rayT); 	// set up hitpoint data
+  vec4.transformMat4(myHit.surfNorm, vec4.fromValues(0,0,1,0), this.normal2world);
+	//-------------find hit-point color:----------------
+  var loc = myHit.modelHitPt[0] / this.xgap;// how many 'xgaps' from the origin?
+  if(myHit.modelHitPt[0] < 0) loc = -loc;   // keep >0 to form double-width line at yaxis.
+  if(loc%1 < this.lineWidth) {    // fractional part of loc < linewidth?
+		myHit.calcLighting(inRay, this.lineColor); 	// calculate lighting
+    return;
+  }
+  loc = myHit.modelHitPt[1] / this.ygap;    // how many 'ygaps' from origin?
+  if(myHit.modelHitPt[1] < 0) loc = -loc;   // keep >0 to form double-width line at xaxis.
+  if(loc%1 < this.lineWidth) {  // fractional part of loc < linewidth?
+		myHit.calcLighting(inRay, this.lineColor); 	// calculate lighting
+    return;
+  }
+	myHit.calcLighting(inRay, this.gapColor); 	// calculate lighting
+  return;
+}
+
+CGeom.prototype.traceCube = function(inRay, myHit) {
+	//Transform 'inRay' by this.worldRay2model matrix;
+  var rayT = this.getModelRay(inRay);
+
+  // find ray/cube intersection: t0 == value where ray hits the xyz +/- 1.0.
+	for (let i=0; i < 2; i++) {  // check  xyz +/- 1.0
+		for (let j=0; j<=2; j++) { 		// check x y z
+			let t0 = (2*i-1.0-rayT.orig[j])/rayT.dir[j];
+			var modelHit = vec4.create();
+		  vec4.scaleAndAdd(modelHit, rayT.orig, rayT.dir, t0);
+			if (t0 > myHit.t0) continue;
+			if (j!=0 && (modelHit[0] > 1.0 || modelHit[0] < -1.0)) continue;
+			if (j!=1 && (modelHit[1] > 1.0 || modelHit[1] < -1.0)) continue;
+			if (j!=2 && (modelHit[2] > 1.0 || modelHit[2] < -1.0)) continue;
+			this.setHitPt(myHit, t0, inRay, rayT); 	// set up hitpoint data
+			if (j==0) 		 myHit.surfNorm = vec4.fromValues(2*i-1,0,0,0);
+			else if (j==1) myHit.surfNorm = vec4.fromValues(0,2*i-1,0,0);
+			else if (j==2) myHit.surfNorm = vec4.fromValues(0,0,2*i-1,0);
+			myHit.calcLighting(inRay, this.color); 	// calculate lighting
+		}
 	}
-	// convert back to world coordinates
-	if (hit.pos != null) {
-		vec4.transformMat4(hit.pos, hit.pos, this.model2world);
+}
+
+CGeom.prototype.traceCylinder = function(inRay, myHit) {
+	//Transform 'inRay' by this.worldRay2model matrix;
+  var rayT = this.getModelRay(inRay);
+
+  // find ray/cube intersection: t0 == value where ray hits the xyz +/- 1.0.
+	var modelHit = vec4.create();
+	for (let i=0; i < 2; i++) {  // check  x +/- 1.0
+		let t0 = (2*i-1.0-rayT.orig[2])/rayT.dir[2];
+	  vec4.scaleAndAdd(modelHit, rayT.orig, rayT.dir, t0);
+		if (t0 > myHit.t0) continue;
+		if (modelHit[0]**2 + modelHit[1]**2 > 1.0) continue;
+		this.setHitPt(myHit, t0, inRay, rayT); 	// set up hitpoint data
+		vec4.transformMat4(myHit.surfNorm, vec4.fromValues(0,0,2*i-1.0,0), this.normal2world);
+		myHit.calcLighting(inRay, this.color); 	// calculate lighting
 	}
-	return hit;
+	let t1, t2, t0 = g_t0_MAX;
+	var a = rayT.dir[0]**2 + rayT.dir[1]**2;
+	var b = 2*rayT.orig[0]*rayT.dir[0] + 2*rayT.orig[1]*rayT.dir[1];
+	var c = rayT.orig[0]**2 + rayT.orig[1]**2 - 1;
+	[t1, t2] = this.solveQuadratic(a, b, c);
+	if (!isNaN(t1) && t1 < t0 && t1 > 0) t0 = t1;
+	if (!isNaN(t2) && t2 < t0 && t2 > 0) t0 = t2;
+	vec4.scaleAndAdd(modelHit, rayT.orig, rayT.dir, t0);
+	if (modelHit[2] > 1.0 || modelHit[2] < -1.0) return;
+	if (t0 >= myHit.t0) return;
+	this.setHitPt(myHit, t0, inRay, rayT); 	// set up hitpoint data
+	vec4.transformMat4(myHit.surfNorm, vec4.fromValues(modelHit[0],modelHit[1],0,0), this.normal2world);
+	myHit.calcLighting(inRay, this.color); 	// calculate lighting
 }
 
-CGeom.prototype.traceGrid = function(inRay) {
-//=============================================================================
-// Find intersection of CRay object 'inRay' with grid-plane at z== this.zGrid
-// return -1 if ray MISSES the plane
-// return  0 if ray hits BETWEEN lines
-// return  1 if ray hits ON the lines
-// HOW?!?
-// 1) we parameterize the ray by 't', so that we can find any point on the
-// ray by:
-//          Ray(t) = ray.orig + t*ray.dir
-// To find where the ray hit the plane, solve for t where Ray(t) = x,y,zGrid:
-// Re-write:
-//      Ray(t0).x = ray.orig[0] + t0*ray.dir[0] = x-value at hit-point (UNKNOWN!)
-//      Ray(t0).y = ray.orig[1] + t0*ray.dir[1] = y-value at hit-point (UNKNOWN!)
-//      Ray(t0).z = ray.orig[2] + t0*ray.dir[2] = zGrid    (we KNOW this one!)
-//
-//  solve for t0:   t0 = (zGrid - ray.orig[2]) / ray.dir[2]
-//  From t0 we can find x,y value at the hit-point too.
-//  Wait wait wait --- did we consider ALL the possibilities?  No, not really:
-//  If t0 <0, we can only hit the plane at points BEHIND our camera;
-//  thus the ray going FORWARD through the camera MISSED the plane!.
-//
-// 2) Our grid-plane exists for all x,y, at the value z=zGrid, and is covered by
-//    a grid of lines whose width is set by 'linewidth'.  The repeated lines of
-//    constant-x have spacing (repetition period) of xgap, and the lines of
-//    constant-y have spacing of ygap.
-//    GIVEN a hit-point (x,y,zGrid) on the grid-plane, find the color by:
-//         if((x/xgap) has fractional part < linewidth  *OR*
-//            (y/ygap) has fractional part < linewidth), you hit a line on
-//            the grid. Use 'lineColor.
-//        otherwise, the ray hit BETWEEN the lines; use 'gapColor'
+CGeom.prototype.traceSphere = function(inRay, myHit) {
+	// Find intersection of CRay object 'inRay' with sphere of radius 1 centered at
+	// the origin in the 'model' coordinate system.
 
-  var t0 = (this.zGrid -inRay.orig[2])/inRay.dir[2];
-          // find ray/grid-plane intersection: t0 == value where ray hits plane.
-  if(t0 < 0) {
-    return new CHit(null, this.skyColor);      // ray is BEHIND eyepoint.
-  }
-  // compute the x,y,z point where inRay hit the grid-plane
-  var hitPt = vec4.fromValues(inRay.orig[0] + inRay.dir[0]*t0,
-                              inRay.orig[1] + inRay.dir[1]*t0,
-                              this.zGrid, 1.0);
-  if (hitPt[0] > 50.0 || hitPt[0] < -50.0 || hitPt[1] > 50.0 || hitPt[1] < -50.0)
-		return new CHit(null, this.skyColor); //out of bounds
-	// remember, hit-point x,y could be positive or negative:
-  var loc = hitPt[0] / this.xgap; // how many 'xgaps' from the origin?
-  if(hitPt[0] < 0) loc = -loc;    // keep >0 to form double-width line at yaxis.
-  if(loc%1 < this.lineWidth) {    // hit a line of constant-x?
-    return new CHit(hitPt, this.lineColor);       // yes.
-  }
-  loc = hitPt[1] / this.ygap;     // how many 'ygaps' from origin?
-  if(hitPt[1] < 0) loc = -loc;    // keep >0 to form double-width line at xaxis.
-  if(loc%1 < this.lineWidth) {   // hit a line of constant-y?
-      return new CHit(hitPt, this.lineColor);       // yes.
-  }
-  return new CHit(hitPt, this.skyColor);         // No.
+	//Transform 'inRay' by this.worldRay2model matrix;
+  var rayT = this.getModelRay(inRay);
+
+  var r2s = vec4.create();
+  vec4.subtract(r2s, vec4.fromValues(0,0,0,1), rayT.orig);
+  // Find L2, the squared length of r2s, by dot-product with itself:
+  var L2 = vec3.dot(r2s,r2s);
+  var tcaS = vec3.dot(rayT.dir, r2s); // tcaS == SCALED tca;
+  if(tcaS < 0.0) return;
+  var DL2 = vec3.dot(rayT.dir, rayT.dir);
+  var tca2 = tcaS*tcaS / DL2;
+  var LM2 = L2 - tca2;
+  if(LM2 > 1.0) return;
+  var L2hc = (1.0 - LM2); // SQUARED half-chord length.
+  var t0hit = tcaS/DL2 -Math.sqrt(L2hc/DL2);  // closer of the 2 hit-points.
+  if(t0hit > myHit.t0) return;
+
+  this.setHitPt(myHit, t0hit, inRay, rayT); 	// set up hitpoint data
+  vec4.transformMat4(myHit.surfNorm, myHit.modelHitPt, this.normal2world); 	// COMPUTE the surface normal
+	myHit.calcLighting(inRay, this.color); 	// calculate lighting
+
+  // FOR LATER:
+  // If the ray begins INSIDE the sphere (because L2 < radius^2),
+    //      ====================================
+    //      t0 = tcaS/DL2 - sqrt(L2hc/DL2)  // NEGATIVE; behind the ray start pt
+    //      t1 = tcaS/DL2 + sqrt(L2hc/DL2)  // POSITIVE: in front of ray origin.
+    //      ====================================
+    //  Use the t1 hit point, as only t1 is AHEAD of the ray's origin.
 }
 
-CGeom.prototype.traceDisk = function(inRay) {
+CGeom.prototype.solveQuadratic = function(a, b, c) {
+	let x1 = (-b + Math.sqrt(b**2 - 4*a*c)) / (2 * a);
+	let x2 = (-b - Math.sqrt(b**2 - 4*a*c)) / (2 * a);
+	return [x1, x2];
+}
 
-  var t0 = (this.zGrid -inRay.orig[2])/inRay.dir[2];
-  // compute the x,y,z point where inRay hit the grid-plane
-  var hitPt = vec4.fromValues(inRay.orig[0] + inRay.dir[0]*t0,
-                              inRay.orig[1] + inRay.dir[1]*t0,
-                              this.zGrid, 1.0);
-  if (hitPt[0]**2 + hitPt[1]**2 > 25)
-		return new CHit(null, this.skyColor); //out of bounds
-	// remember, hit-point x,y could be positive or negative:
-  var loc = hitPt[0] / this.xgap; // how many 'xgaps' from the origin?
-  if(hitPt[0] < 0) loc = -loc;    // keep >0 to form double-width line at yaxis.
-  if(loc%1 < this.lineWidth) {    // hit a line of constant-x?
-    return new CHit(hitPt, this.lineColor);       // yes.
-  }
-  loc = hitPt[1] / this.ygap;     // how many 'ygaps' from origin?
-  if(hitPt[1] < 0) loc = -loc;    // keep >0 to form double-width line at xaxis.
-  if(loc%1 < this.lineWidth) {   // hit a line of constant-y?
-		return new CHit(hitPt, this.lineColor);      // yes.
-  }
-	return new CHit(hitPt, this.gapColor);      // No.
+CGeom.prototype.setHitPt = function(myHit, t0, inRay, rayT) {
+	myHit.t0 = t0;          // record ray-length, and
+	myHit.hitGeom = this;      // record this CGeom object as the one we hit
+	// compute model and world space hit point
+	vec4.scaleAndAdd(myHit.modelHitPt, rayT.orig, rayT.dir, myHit.t0);
+	vec4.scaleAndAdd(myHit.hitPt, inRay.orig, inRay.dir, myHit.t0);
+}
+
+CGeom.prototype.getModelRay = function(inRay) {
+	var rayT = new CRay();    // create a local transformed-ray variable.
+	vec4.transformMat4(rayT.orig, inRay.orig, this.worldRay2model);
+	vec4.transformMat4(rayT.dir,  inRay.dir,  this.worldRay2model);
+	return rayT;
 }

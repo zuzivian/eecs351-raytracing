@@ -173,10 +173,6 @@ VBObox1.prototype.init = function() {
     return -1;	// error exit.
   }
 
-  // Fill our global floating-point image object 'g_myPic' with a test-pattern.
-  g_myPic.setTestPattern(0);    // 0 == colorful 'L' shape. 1 == all orange.
-  // the g_myPic.iBuf member is a uint8 array; data source for WebGL texture map
-
   // Enable texture unit0 for our use
   gl.activeTexture(gl.TEXTURE0);
   // Bind the texture object we made in initTextures() to the target
@@ -185,12 +181,12 @@ VBObox1.prototype.init = function() {
   gl.texImage2D(gl.TEXTURE_2D,    //  'target'--the use of this texture
   						0, 									//  MIP-map level (default: 0)
   						gl.RGB, 					  // GPU's data format (RGB? RGBA? etc)
-              g_myPic.xSiz,         // texture image width in pixels
-              g_myPic.ySiz,         // texture image height in pixels.
+              g_myScene.imgBuf.xSiz,         // texture image width in pixels
+              g_myScene.imgBuf.ySiz,         // texture image height in pixels.
 							0,									// byte offset to start of data
   						gl.RGB, 					  // source/input data format (RGB? RGBA?)
   						gl.UNSIGNED_BYTE,	  // data type for each color channel
-              g_myPic.iBuf);        // 8-bit RGB image data source.
+              g_myScene.imgBuf.iBuf);        // 8-bit RGB image data source.
   // Set the WebGL texture-filtering parameters
   gl.texParameteri(gl.TEXTURE_2D,		// texture-sampling params:
   						     gl.TEXTURE_MIN_FILTER,
@@ -364,11 +360,11 @@ VBObox1.prototype.reload = function() {
   gl.texSubImage2D(gl.TEXTURE_2D, 	//  'target'--the use of this texture
   							0, 							//  MIP-map level (default: 0)
   							0,0,						// xoffset, yoffset (shifts the image)
-								g_myPic.xSiz,			// image width in pixels,
-								g_myPic.ySiz,			// image height in pixels,
+								g_myScene.imgBuf.xSiz,			// image width in pixels,
+								g_myScene.imgBuf.ySiz,			// image height in pixels,
   							gl.RGB, 				// source/input data format (RGB? RGBA?)
   							gl.UNSIGNED_BYTE, 	// data type for each color channel
-								g_myPic.iBuf);	  // texture-image data source.
+								g_myScene.imgBuf.iBuf);	  // texture-image data source.
 }
 
 
