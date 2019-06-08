@@ -17,8 +17,21 @@
 	    <span id='AAreport'> 1 sample/pixel. No jitter. </span>
       	<br>
 	    <button type="button" onclick="onSceneButton()" >Change Scene</button>
-	    <span id='SceneReport'> Show Scene Number 0 </span>
-  <br>
+      <span id='SceneReport'> Scene Number: 0 </span>
+        <br>
+      <button type="button" onclick="onRecursion(-1)" >Decrease </button>
+      <button type="button" onclick="onRecursion(1)" >Increase</button>
+      <span id='recursionReport'> Recursion Depth: 1 </span>
+        <br>
+    <div class="slidecontainer">
+      <button type="button" onclick="onLampButton(0)" >Toggle Lamp 0</button>
+      Controlled by user camera
+      <button type="button" onclick="onLampButton(1)" >Toggle Lamp 1</button>
+    </br>
+      Position X <input type="range" min="-10" max="10" value="0" class="slider" id="l2posX">
+      Position Y <input type="range" min="-10" max="10" value="-8" class="slider" id="l2posY">
+      Position Z <input type="range" min="-10" max="10" value="3" class="slider" id="l2posZ">
+    </div>
 	<br>
 	    Mouse Drag: Aims the camera (turns left,right,up,down)
 	<br>
@@ -35,6 +48,8 @@
     <script src="vbo/VBOBox0.js"></script>
 		<script src="vbo/VBOBox1.js"></script>
 
+    <script src="tracer/CLamp.js"></script>
+    <script src="tracer/CMatl.js"></script>
     <script src="tracer/CRay.js"></script>
 		<script src="tracer/CCamera.js"></script>
     <script src="tracer/CGeom.js"></script>

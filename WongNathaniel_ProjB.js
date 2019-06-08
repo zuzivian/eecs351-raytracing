@@ -21,9 +21,9 @@ var preView = new VBObox0();		// For WebGLpreview: holds one VBO and its shaders
 var rayView = new VBObox1();		// for displaying the ray-tracing results.
 //-----------Ray Tracer Objects:---------------
 var g_myScene = new CScene(new CImgBuf(256,256)); // Create our ray-tracing object;
-var G_SCENE_MAX = 4;		// Number of scenes defined.
+var G_SCENE_MAX = 3;		// Number of scenes defined.
 var g_SceneNum = 0;			// scene-selector number; 0,1,2,... G_SCENE_MAX-1
-
+var g_RecursionDepth = 1;
 
 function main() {
   // Retrieve the HTML-5 <canvas> element where webGL will draw our pictures:
@@ -109,12 +109,23 @@ function updateTracerInfo() {
 function onSceneButton() {
 	if(g_SceneNum < 0 || g_SceneNum >= G_SCENE_MAX-1) g_SceneNum = 0;
 	else g_SceneNum = g_SceneNum +1;
-	document.getElementById('SceneReport').innerHTML = 'Scene Number ' + g_SceneNum;
+	document.getElementById('SceneReport').innerHTML = 'Scene Number: ' + g_SceneNum;
   // Change g_myPic contents:
   g_myScene.initScene(g_SceneNum);
   rayView.switchToMe(); // be sure OUR VBO & shaders are in use, then
   rayView.reload();     // re-transfer VBO contents and texture-map contents
   drawAll();
+}
+
+function onLampButton(num) {
+  g_myScene.lamps[num].isLit = !g_myScene.lamps[num].isLit;
+}
+
+function onRecursion(num) {
+  g_RecursionDepth += num;
+  if (g_RecursionDepth < 0) g_RecursionDepth = 0;
+  if (g_RecursionDepth > 16) g_RecursionDepth = 16;
+  document.getElementById('recursionReport').innerHTML = 'Recusion depth: ' + g_RecursionDepth;
 }
 
 function onBrowserResize() {

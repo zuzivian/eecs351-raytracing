@@ -11,6 +11,7 @@ const JT_CYLINDER = 3;    // A cylinder with user-settable radius at each end
 const JT_TRIANGLE = 4;    // a triangle with 3 vertices.
 const JT_BLOBBIES = 5;    // Implicit surface:Blinn-style Gaussian 'blobbies'.
 const JT_DISK = 5;    // 2D disk on z-plane
+const JT_SKY = 6;    // 2D disk on z-plane
 
 
 function CGeom(shapeSelect) {
@@ -21,8 +22,9 @@ function CGeom(shapeSelect) {
 // describe ANY shape, including sphere, box, cone, quadric, etc. and it holds
 // all/any variables needed for each shapeType.
 
-	if(shapeSelect == undefined) shapeSelect = JT_GNDPLANE;	// default
+	if(shapeSelect == undefined) shapeSelect = JT_SKY;	// default
 	this.shapeType = shapeSelect;
+	this.matl = new CMatl(MATL_DEFAULT);
 	switch(this.shapeType) {
 	  case JT_GNDPLANE: //--------------------------------------------------------
 	    //set the ray-tracing function (so we call it using item[i].traceMe() )
@@ -45,18 +47,18 @@ function CGeom(shapeSelect) {
 	    break;
 	  case JT_SPHERE: //----------------------------------------------------------
 	    //set the ray-tracing function (so we call it using item[i].traceMe() )
-    	this.color = vec4.fromValues(1.0,0.0,0.0,1.0);  // RGBA red(A==opacity)
 			this.trace = function(inR,hit) { this.traceSphere(inR,hit);   };
 	    break;
 		case JT_BOX: //----------------------------------------------------------
 			//set the ray-tracing function (so we call it using item[i].traceMe() )
-			this.color = vec4.fromValues(0.0,1.0,0.0,1.0);  // RGBA blue
 			this.trace = function(inR,hit) { this.traceCube(inR,hit);   };
 			break;
 		case JT_CYLINDER: //----------------------------------------------------------
 			//set the ray-tracing function (so we call it using item[i].traceMe() )
-			this.color = vec4.fromValues(0.0,0.0,1.0,1.0);  // RGBA green
 			this.trace = function(inR,hit) { this.traceCylinder(inR,hit);   };
+			break;
+		case JT_SKY:
+			this.matl.setMatl(MATL_BLACK_RUBBER);
 			break;
 	  default:
 	    console.log("CGeom() constructor: ERROR! INVALID shapeSelect:", shapeSelect);
@@ -70,8 +72,6 @@ function CGeom(shapeSelect) {
                                     // to WORLD-space coords (where we need
                                     // them for lighting calcs.)
 	this.worldRay2model = mat4.create();
-	this.model2world = mat4.create();
-	// Ground-plane 'Line-grid' parameters:
 }
 
 CGeom.prototype.setIdent = function() {
@@ -185,16 +185,19 @@ CGeom.prototype.traceGrid = function(inRay, myHit) {
   if(myHit.modelHitPt[0] < 0) loc = -loc;    // keep >0 to form double-width line at yaxis.
 //console.log("loc",loc, "loc%1", loc%1, "lineWidth", this.lineWidth);
   if(loc%1 < this.lineWidth) {    // fractional part of loc < linewidth?
-		myHit.calcLighting(inRay, this.lineColor); 	// calculate lighting
-    return;
+		this.matl.setMatl(MATL_BLACK_RUBBER);
+		myHit.calcNormals(inRay); 	// calculate lighting
+		return;
   }
   loc = myHit.modelHitPt[1] / this.ygap;     // how many 'ygaps' from origin?
   if(myHit.modelHitPt[1] < 0) loc = -loc;    // keep >0 to form double-width line at xaxis.
   if(loc%1 < this.lineWidth) {    // fractional part of loc < linewidth?
-		myHit.calcLighting(inRay, this.lineColor); 	// calculate lighting
-    return;
+		this.matl.setMatl(MATL_BLACK_RUBBER);
+		myHit.calcNormals(inRay); 	// calculate lighting
+		return;
   }
-	myHit.calcLighting(inRay, this.gapColor); 	// calculate lighting
+	this.matl.setMatl(MATL_SILVER_DULL);
+	myHit.calcNormals(inRay); 	// calculate lighting
   return;
 }
 
@@ -216,20 +219,7 @@ CGeom.prototype.traceDisk = function(inRay, myHit) {
 	// YES! we found a better hit-point!
 	this.setHitPt(myHit, t0, inRay, rayT); 	// set up hitpoint data
   vec4.transformMat4(myHit.surfNorm, vec4.fromValues(0,0,1,0), this.normal2world);
-	//-------------find hit-point color:----------------
-  var loc = myHit.modelHitPt[0] / this.xgap;// how many 'xgaps' from the origin?
-  if(myHit.modelHitPt[0] < 0) loc = -loc;   // keep >0 to form double-width line at yaxis.
-  if(loc%1 < this.lineWidth) {    // fractional part of loc < linewidth?
-		myHit.calcLighting(inRay, this.lineColor); 	// calculate lighting
-    return;
-  }
-  loc = myHit.modelHitPt[1] / this.ygap;    // how many 'ygaps' from origin?
-  if(myHit.modelHitPt[1] < 0) loc = -loc;   // keep >0 to form double-width line at xaxis.
-  if(loc%1 < this.lineWidth) {  // fractional part of loc < linewidth?
-		myHit.calcLighting(inRay, this.lineColor); 	// calculate lighting
-    return;
-  }
-	myHit.calcLighting(inRay, this.gapColor); 	// calculate lighting
+	myHit.calcNormals(inRay); 	// calculate lighting
   return;
 }
 
@@ -241,9 +231,9 @@ CGeom.prototype.traceCube = function(inRay, myHit) {
 	for (let i=0; i < 2; i++) {  // check  xyz +/- 1.0
 		for (let j=0; j<=2; j++) { 		// check x y z
 			let t0 = (2*i-1.0-rayT.orig[j])/rayT.dir[j];
+			if (t0 < 0 || t0 > myHit.t0) continue;
 			var modelHit = vec4.create();
 		  vec4.scaleAndAdd(modelHit, rayT.orig, rayT.dir, t0);
-			if (t0 > myHit.t0) continue;
 			if (j!=0 && (modelHit[0] > 1.0 || modelHit[0] < -1.0)) continue;
 			if (j!=1 && (modelHit[1] > 1.0 || modelHit[1] < -1.0)) continue;
 			if (j!=2 && (modelHit[2] > 1.0 || modelHit[2] < -1.0)) continue;
@@ -251,7 +241,7 @@ CGeom.prototype.traceCube = function(inRay, myHit) {
 			if (j==0) 		 myHit.surfNorm = vec4.fromValues(2*i-1,0,0,0);
 			else if (j==1) myHit.surfNorm = vec4.fromValues(0,2*i-1,0,0);
 			else if (j==2) myHit.surfNorm = vec4.fromValues(0,0,2*i-1,0);
-			myHit.calcLighting(inRay, this.color); 	// calculate lighting
+			myHit.calcNormals(inRay); 	// calculate lighting
 		}
 	}
 }
@@ -264,26 +254,26 @@ CGeom.prototype.traceCylinder = function(inRay, myHit) {
 	var modelHit = vec4.create();
 	for (let i=0; i < 2; i++) {  // check  x +/- 1.0
 		let t0 = (2*i-1.0-rayT.orig[2])/rayT.dir[2];
+		if (t0 > myHit.t0 || t0 < 0) continue;
 	  vec4.scaleAndAdd(modelHit, rayT.orig, rayT.dir, t0);
-		if (t0 > myHit.t0) continue;
 		if (modelHit[0]**2 + modelHit[1]**2 > 1.0) continue;
 		this.setHitPt(myHit, t0, inRay, rayT); 	// set up hitpoint data
 		vec4.transformMat4(myHit.surfNorm, vec4.fromValues(0,0,2*i-1.0,0), this.normal2world);
-		myHit.calcLighting(inRay, this.color); 	// calculate lighting
+		myHit.calcNormals(inRay); 	// calculate lighting
 	}
 	let t1, t2, t0 = g_t0_MAX;
 	var a = rayT.dir[0]**2 + rayT.dir[1]**2;
 	var b = 2*rayT.orig[0]*rayT.dir[0] + 2*rayT.orig[1]*rayT.dir[1];
 	var c = rayT.orig[0]**2 + rayT.orig[1]**2 - 1;
 	[t1, t2] = this.solveQuadratic(a, b, c);
-	if (!isNaN(t1) && t1 < t0 && t1 > 0) t0 = t1;
-	if (!isNaN(t2) && t2 < t0 && t2 > 0) t0 = t2;
+	if (t1 < t0 && t1 > 0) t0 = t1;
+	if (t2 < t0 && t2 > 0) t0 = t2;
 	vec4.scaleAndAdd(modelHit, rayT.orig, rayT.dir, t0);
 	if (modelHit[2] > 1.0 || modelHit[2] < -1.0) return;
 	if (t0 >= myHit.t0) return;
 	this.setHitPt(myHit, t0, inRay, rayT); 	// set up hitpoint data
 	vec4.transformMat4(myHit.surfNorm, vec4.fromValues(modelHit[0],modelHit[1],0,0), this.normal2world);
-	myHit.calcLighting(inRay, this.color); 	// calculate lighting
+	myHit.calcNormals(inRay); 	// calculate lighting
 }
 
 CGeom.prototype.traceSphere = function(inRay, myHit) {
@@ -305,11 +295,11 @@ CGeom.prototype.traceSphere = function(inRay, myHit) {
   if(LM2 > 1.0) return;
   var L2hc = (1.0 - LM2); // SQUARED half-chord length.
   var t0hit = tcaS/DL2 -Math.sqrt(L2hc/DL2);  // closer of the 2 hit-points.
-  if(t0hit > myHit.t0) return;
+  if(t0hit > myHit.t0 || t0hit < 0) return;
 
   this.setHitPt(myHit, t0hit, inRay, rayT); 	// set up hitpoint data
-  vec4.transformMat4(myHit.surfNorm, myHit.modelHitPt, this.normal2world); 	// COMPUTE the surface normal
-	myHit.calcLighting(inRay, this.color); 	// calculate lighting
+  vec4.transformMat4(myHit.surfNorm, vec4.fromValues(myHit.modelHitPt[0],myHit.modelHitPt[1],myHit.modelHitPt[2],0.0), this.normal2world); 	// COMPUTE the surface normal
+	myHit.calcNormals(inRay); 	// calculate lighting
 
   // FOR LATER:
   // If the ray begins INSIDE the sphere (because L2 < radius^2),

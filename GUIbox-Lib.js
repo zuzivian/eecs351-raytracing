@@ -228,6 +228,8 @@ GUIbox.prototype.mouseDown = function(mev) {
 																			// (result in  this.xCVV, this.yCVV)
 	this.xMpos = this.xCVV;             // save current position, and...
 	this.yMpos = this.yCVV;
+  console.log(this.yCVV);
+  if (this.yCVV < -1.0) return;
 	this.isDrag = true;						  		// set our mouse-dragging flag
 	console.log('GUIbox.mouseDown(): xMpos,yMpos== ' +
 	  this.xMpos.toFixed(5) + ', ' + this.yMpos.toFixed(5));

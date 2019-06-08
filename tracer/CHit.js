@@ -8,7 +8,7 @@ function CHit() {
   // CScene.item[] array).
   // CAREFUL! We don't use isolated CHit objects, but instead gather all the CHit
   // objects for one ray in one list held inside a CHitList object.
-  this.hitGeom = null;
+  this.hitGeom = new CGeom(JT_SKY);
 
   this.t0 = g_t0_MAX;         // 'hit time' parameter for the ray; defines one
                               // 'hit-point' along ray:   orig + t*dir = hitPt.
@@ -20,6 +20,7 @@ function CHit() {
   this.viewN = vec4.create(); // Unit-length vector from hitPt back towards
                               // the origin of the ray we traced.  (VERY
                               // useful for Phong lighting, etc.)
+  this.reflRay = vec4.create();
   this.isEntering=true;       // true iff ray origin was OUTSIDE the hitGeom.
                               //(example; transparency rays begin INSIDE).
 
@@ -34,17 +35,7 @@ function CHit() {
   // to 'model' coord sys. before we trace the ray.  We find the ray's
   // collision length 't' in model space, but we can use it on the world-
   // space rays to find world-space hit-point as well.
-  //      However, some materials and shading methods work best in model
-  // coordinates too; for example, if we evaluate procedural textures
-  // (grid-planes, checkerboards, 3D woodgrain textures) in the 'model'
-  // instead of the 'world' coord system, they'll stay 'glued' to the CGeom
-  // object as we move it around in world-space (by changing worldRay2Model
-  // matrix), and the object's surface patterns won't change if we 'squeeze'
-  // or 'stretch' it by non-uniform scaling.
-  this.colr = vec4.clone(g_myScene.skyColor);   // set default as 'sky'
-                              // The final color we computed for this point,
-                              // (note-- not used for shadow rays).
-                              // (uses RGBA. A==opacity, default A=1=opaque.
+
   this.init();
 }
 
@@ -52,10 +43,8 @@ CHit.prototype.init  = function() {
 //==============================================================================
 // Set this CHit object to describe a 'sky' ray that hits nothing at all;
 // clears away all CHit's previously-stored description of any ray hit-point.
-  this.hitGeom = -1;            // (reference to)the CGeom object we pierced in
+  this.hitGeom = new CGeom(JT_SKY);            // (reference to)the CGeom object we pierced in
                                 //  in the CScene.item[] array (null if 'none').
-  this.hitNum = -1; // TEMPORARY:
-  // holds traceGrid() or traceDisk() result.
 
   this.t0 = g_t0_MAX;           // 'hit time' for the ray; defines one
                                 // 'hit-point' along ray:   orig + t*dir = hitPt.
@@ -67,22 +56,19 @@ CHit.prototype.init  = function() {
   vec4.set(this.viewN,-1,0,0,0);// Unit-length vector from hitPt back towards
                                 // the origin of the ray we traced.  (VERY
                                 // useful for Phong lighting, etc.)
+  vec4.set(this.reflRay,-1,0,0,0);
   this.isEntering=true;         // true iff ray origin was OUTSIDE the hitGeom.
                                 //(example; transparency rays begin INSIDE).
   vec4.copy(this.modelHitPt,this.hitPt);// the 'hit point' in model coordinates.
 }
 
-CHit.prototype.set = function(pos, colr) {
-  this.hitPt = pos;
-  this.colr = colr;
-}
-
-CHit.prototype.calcLighting = function(inRay, color) {
+CHit.prototype.calcNormals = function(inRay) {
   // calculate the view Normal
   vec4.negate(this.viewN, inRay.dir);     // reversed, normalized inRay.dir:
   vec4.normalize(this.viewN, this.viewN); // make view vector unit-length.
-  vec4.normalize(this.surfNorm, this.surfNorm); // maske surface normal unit-length
-  // calculate diffuse lighting of the object
-  var diffuse = vec4.dot(this.viewN, this.surfNorm);
-  vec4.scaleAndAdd(this.colr, vec4.create(), color, diffuse);
+  vec4.normalize(this.surfNorm, this.surfNorm); // mask surface normal unit-length
+  vec4.negate(this.reflRay, this.viewN); // reflRay = 2 * surfNorm (viewN . surfNorm) - viewN
+  var scale = 2 * vec4.dot(this.viewN, this.surfNorm);
+  vec4.scaleAndAdd(this.reflRay, this.reflRay, this.surfNorm, scale);
+  vec4.normalize(this.reflRay, this.reflRay); // maske reflected ray unit-length
 }

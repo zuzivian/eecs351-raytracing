@@ -29,14 +29,9 @@ CHitList.prototype.findDistance = function(hit) {
 
 CHitList.prototype.findNearest = function() {
   for (let i=0; i < this.pierce.length; i++) {
-    if (this.pierce[i].hitPt == null) continue; // not a valid point
     if (this.findDistance(this.pierce[i]) < this.findDistance(this.pierce[this.iNearest])) {
       this.iNearest = i;
     }
   }
-}
-
-CHitList.prototype.getNearestColor = function() {
-  this.findNearest();
-  return this.pierce[this.iNearest].colr;
+  return this.pierce[this.iNearest];
 }
